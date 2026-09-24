@@ -7,11 +7,16 @@ import { clampFocal, clampFocus, maxApertureAt } from './equipment';
 import { APERTURES, ISOS, SHUTTER_SPEEDS, stopsInRange, type StopValue } from './stops';
 import type { Support } from './shake';
 import type { ExposureTriangle } from './exposure';
+import type { ExposureMode } from './modes';
 
 export type FocusMode = 'AF-S' | 'AF-C' | 'MF';
 export type MeteringMode = 'evaluative' | 'center' | 'spot';
 
 export interface CameraSettings {
+  /** M / A / S / P. */
+  mode: ExposureMode;
+  autoIso: boolean;
+  autoIsoMax: number;
   bodyId: string;
   lensId: string;
   focalLengthMm: number;

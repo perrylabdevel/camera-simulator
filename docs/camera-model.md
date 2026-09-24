@@ -82,3 +82,28 @@ The critique is deterministic. It uses what the simulator knows: clipped
 fractions from the actual photo, subject distances along the axis,
 measured image-plane motion, defocus blur, shake blur, and mid-tone SNR.
 Each note states the cause and what would change it.
+
+## Exposure modes (`sim/modes.ts`)
+
+* Target: `EV100_target = meter − exposure compensation`, using the APEX
+  relation `log2(N²) + log2(1/t) = EV100 + log2(S/100)`.
+* **A:** the photographer sets N; the camera solves t. **S:** the
+  photographer sets t; the camera solves N. **P:** a program line that
+  stays wide open until t reaches 1/focal, then splits further light
+  equally between aperture and shutter.
+* **Auto ISO:** starts at base ISO and raises it only as far as needed to
+  keep t ≤ 1/focal (reciprocal rule), capped at the chosen maximum. In M,
+  Auto ISO picks the ISO for the chosen N and t.
+* Results snap to the body and lens 1/3-stop scales. If the target is out
+  of range by more than 1/3 stop, the camera reports `too-bright` /
+  `too-dark` (shown as HI/LO in the viewfinder).
+
+## Panning
+
+The photographer's angular velocity over the last ~0.15 s before the
+press is extrapolated through the exposure. The capture renders each
+sub-frame with the camera rotated by `ω·t`, plus shake. Subject blur is
+then measured relative to the moving frame, and background sweep is
+`|ω|·t·f` on the sensor. The critique compares the swing rate with the
+subject's angular rate (the rate that would have tracked it). *Tracking
+assist* substitutes that ideal rate, to show what a perfect pan looks like.

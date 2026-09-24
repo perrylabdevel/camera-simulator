@@ -14,6 +14,8 @@ current deliberate shortcuts.
 | Metering | The evaluative pattern is a documented heuristic. | Behaves sensibly; no real vendor's algorithm is copied. |
 | Shadowing of sky light | Tree canopies approximate sky occlusion analytically (sphere solid angle). No SSAO. | Contact shadows under objects are soft or missing. |
 | People | Procedural skinned bodies (one continuous mesh per figure), a sculpted head with a painted face, set-in eyes and a hair shell. Proportions and scale follow anthropometric averages. | Believable at portrait-to-full-body distances, but still stylised: no skin subsurface scattering, no fine facial detail, and hair is a shell plus a sheet rather than strands. |
+| Wildlife | Gulls, pigeons and a squirrel are simple procedural models on scripted paths (circling, walk/peck, dart/pause). | Correct size, speed and wing-beat rate for shutter and AF lessons, but stylised. The animals don't react to the photographer. |
+| Panning | Swing rate is taken from the view-drag input just before the press and held constant through the exposure. | No acceleration or wobble within the pan. The shake model is still added on top. |
 | Diffraction | Formula implemented; not rendered at preview resolutions. | f/22 is not visibly softer yet. |
 | Rolling shutter, flash, filters, AF performance | Not yet simulated. | Planned phases. |
 | "What you saw" | Instant, eye-adapted to the meter, everything in focus. | A model of perception, not a physical camera. |

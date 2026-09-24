@@ -17,6 +17,8 @@ import { createCyclist, createPerson, poseStanding, type Cyclist, type Person } 
 import { mulberry32, fbm } from './noise';
 import { bikePath, cyclistAt, PATH_CENTER, PATH_RADII, PATH_WIDTH, portraitSway } from '../../world/actors';
 import { superellipsePoints } from '../../world/path';
+import { birdAt, GULLS, PIGEON_COUNT, pigeonAt, squirrelAt } from '../../world/wildlife';
+import { createGull, createPigeon, createSquirrel } from './wildlife';
 
 export type Quality = 'low' | 'medium' | 'high' | 'ultra';
 
@@ -465,6 +467,15 @@ export function buildExposureLab(renderer: THREE.WebGLRenderer, quality: Quality
   scene.add(cyclist.root);
   focusTargets.push(cyclist.root);
 
+  // --- Wildlife -------------------------------------------------------------
+  const gulls = GULLS.map((params) => ({ params, rig: createGull() }));
+  const pigeons = Array.from({ length: PIGEON_COUNT }, (_, i) => createPigeon(i * 0.06 - 0.03));
+  const squirrel = createSquirrel();
+  for (const o of [...gulls.map((g) => g.rig.root), ...pigeons.map((p) => p.root), squirrel.root]) {
+    scene.add(o);
+    focusTargets.push(o);
+  }
+
   const eyeMid = new THREE.Vector3();
   const subjects: Subject[] = [
     {
@@ -483,6 +494,24 @@ export function buildExposureLab(renderer: THREE.WebGLRenderer, quality: Quality
       speed: (time) => cyclistAt(time).speedMps,
       radius: 1.0,
     },
+    ...gulls.map((g) => ({
+      name: 'gull',
+      point: (t: THREE.Vector3) => g.rig.root.getWorldPosition(t),
+      speed: (time: number) => birdAt(g.params, time).speedMps,
+      radius: 0.65,
+    })),
+    ...pigeons.map((pg, i) => ({
+      name: 'pigeon',
+      point: (t: THREE.Vector3) => pg.root.getWorldPosition(t).setY(0.14),
+      speed: (time: number) => pigeonAt(i, time).speedMps,
+      radius: 0.18,
+    })),
+    {
+      name: 'squirrel',
+      point: (t) => squirrel.root.getWorldPosition(t).setY(squirrel.root.position.y + 0.08),
+      speed: (time) => squirrelAt(time).speedMps,
+      radius: 0.2,
+    },
   ];
 
   function setTime(t: number) {
@@ -493,6 +522,9 @@ export function buildExposureLab(renderer: THREE.WebGLRenderer, quality: Quality
     portrait.root.rotation.y = -0.3 + sway.yaw;
     poseStanding(portrait, sway.breath);
     cyclist.update(cyclistAt(t));
+    for (const g of gulls) g.rig.update(birdAt(g.params, t));
+    pigeons.forEach((pg, i) => pg.update(pigeonAt(i, t)));
+    squirrel.update(squirrelAt(t));
     scene.updateMatrixWorld(true);
   }
   setTime(0);

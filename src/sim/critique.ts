@@ -22,6 +22,17 @@ export interface SubjectFacts {
   motionBlurPx: number;
   /** Defocus blur diameter (px). */
   defocusBlurPx: number;
+  /** How fast the subject's direction from the camera turned (°/s) — the pan rate that would track it. */
+  angularRateDegPerS?: number;
+}
+
+export interface PanFacts {
+  /** Camera swing rate during the exposure (°/s). */
+  rateDegPerS: number;
+  /** How far the static background smeared across the frame (px). */
+  backgroundBlurPx: number;
+  /** True when the tracking assist steered the pan. */
+  assisted: boolean;
 }
 
 export interface ShotFacts {
@@ -49,6 +60,8 @@ export interface ShotFacts {
   subjects: SubjectFacts[];
   /** Output-pixel size in mm on the sensor (for converting blur limits). */
   pxPerMm: number;
+  /** Present when the camera was swung during the exposure. */
+  panning?: PanFacts;
 }
 
 export type NoteLevel = 'good' | 'warn' | 'info';
@@ -115,8 +128,44 @@ export function critique(f: ShotFacts): Note[] {
     }
   }
 
+  // --- Panning ------------------------------------------------------------
+  const pan = f.panning;
+  const movers = main.filter((s) => s.lateralSpeedMps >= 0.2);
+  if (pan) {
+    const target = movers[0];
+    const bgStreak = pan.backgroundBlurPx > f.sharpPx * 8;
+    const how = pan.assisted ? ' (tracking assist on)' : '';
+    if (target) {
+      const cls = classifyBlur(target.motionBlurPx, f.sharpPx);
+      const need = target.angularRateDegPerS;
+      if ((cls === 'frozen' || cls === 'slight') && bgStreak) {
+        notes.push({
+          level: 'good',
+          topic: 'motion',
+          text: `A successful pan${how}: you swung at ${pan.rateDegPerS.toFixed(0)}°/s, so the background streaked ~${Math.round(pan.backgroundBlurPx)} px while the ${target.name} moved only ~${Math.round(target.motionBlurPx)} px across the frame.`,
+        });
+      } else {
+        const advice =
+          need !== undefined
+            ? ` To track it you needed about ${need.toFixed(0)}°/s — you were ${pan.rateDegPerS > need ? 'too fast' : 'too slow'}.`
+            : '';
+        notes.push({
+          level: cls === 'slight' ? 'info' : 'warn',
+          topic: 'motion',
+          text: `You panned at ${pan.rateDegPerS.toFixed(0)}°/s${how}, but the ${target.name} still moved ~${Math.round(target.motionBlurPx)} px across the frame, so it is blurred.${advice}${bgStreak ? '' : ' The shutter was also too fast for the background to streak much.'}`,
+        });
+      }
+    } else if (bgStreak) {
+      notes.push({
+        level: 'info',
+        topic: 'motion',
+        text: `The camera was swinging at ${pan.rateDegPerS.toFixed(0)}°/s during the exposure, smearing the whole scene ~${Math.round(pan.backgroundBlurPx)} px. Panning works when you follow a moving subject.`,
+      });
+    }
+  }
+
   // --- Subject motion -----------------------------------------------------
-  for (const s of main) {
+  for (const s of pan ? [] : main) {
     if (s.lateralSpeedMps < 0.2) continue;
     const cls = classifyBlur(s.motionBlurPx, f.sharpPx);
     const freeze = shutterToFreeze(s.lateralSpeedMps, s.distanceM, f.focalMm, f.sharpPx / f.pxPerMm);

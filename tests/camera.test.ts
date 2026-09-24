@@ -20,6 +20,9 @@ const body = (bodies as BodySpec[])[0];
 const lensById = (id: string) => (lenses as LensSpec[]).find((l) => l.id === id)!;
 
 const base: CameraSettings = {
+  mode: 'M',
+  autoIso: false,
+  autoIsoMax: 12800,
   bodyId: body.id,
   lensId: '85-f1.4',
   focalLengthMm: 85,

@@ -10,6 +10,7 @@ import { drawHistogram, type Histogram } from './histogram';
 
 export interface PhotoMeta {
   body: string;
+  mode: string;
   lens: string;
   focalMm: number;
   aperture: number;
@@ -157,6 +158,7 @@ export class Gallery {
     side.append(el('h3', { text: `Photo #${p.id}` }));
     const rows: [string, string][] = [
       ['Camera', m.body],
+      ['Mode', m.mode],
       ['Lens', m.lens],
       ['Focal length', `${Math.round(m.focalMm)} mm`],
       ['Aperture', formatAperture(m.aperture)],

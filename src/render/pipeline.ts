@@ -51,11 +51,13 @@ export interface CaptureSpec {
   /** World time when the shutter opens. */
   t0: number;
   samples: number;
-  /** Camera pose at shutter open. */
+  /** Camera position during the exposure (the photographer stands still). */
   basePosition: THREE.Vector3;
-  baseQuaternion: THREE.Quaternion;
-  /** Camera rotation offset (yaw, pitch, roll radians) at time since shutter open. */
-  shake: (t: number) => { yaw: number; pitch: number; roll: number };
+  /**
+   * Camera orientation at time `t` since the shutter opened: the aim at the
+   * press, plus any panning rotation, plus hand shake.
+   */
+  orientation: (t: number, target: THREE.Quaternion) => THREE.Quaternion;
   seed: number;
   onProgress?: (fraction: number) => void;
 }
@@ -304,7 +306,7 @@ export class PhotoPipeline {
 
   /**
    * Capture a photograph: integrate `samples` renders spread across the
-   * shutter interval (world animation + camera shake + sub-pixel jitter),
+   * shutter interval (world animation + panning + camera shake + sub-pixel jitter),
    * then run the sensor/develop stage once on the integrated light.
    */
   async capture(
@@ -323,8 +325,6 @@ export class PhotoPipeline {
     const r = this.renderer;
     const prevAutoClear = r.autoClear;
     const rand = mulberry32(spec.seed);
-    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-    const shakeQ = new THREE.Quaternion();
     const readImage = () => {
       const buf = new Uint8ClampedArray(w * h * 4);
       r.readRenderTargetPixels(out, 0, 0, w, h, buf);
@@ -339,7 +339,7 @@ export class PhotoPipeline {
       // "What you saw": a single instant, eye-adapted, no noise, everything sharp.
       setTime(spec.t0);
       camera.position.copy(spec.basePosition);
-      camera.quaternion.copy(spec.baseQuaternion);
+      spec.orientation(0, camera.quaternion);
       camera.updateMatrixWorld(true);
       this.renderOptics(scene, camera, optics, targets, w, h, 0, false);
       this.setDevelop(targets.dof.texture, w, h, seenSensor, optics, null, 1);
@@ -355,11 +355,8 @@ export class PhotoPipeline {
         const u = (i + rand()) / n;
         const ts = u * spec.shutterS;
         setTime(spec.t0 + ts);
-        const s = spec.shake(ts);
-        euler.set(s.pitch, s.yaw, s.roll, 'YXZ');
-        shakeQ.setFromEuler(euler);
         camera.position.copy(spec.basePosition);
-        camera.quaternion.copy(spec.baseQuaternion).multiply(shakeQ);
+        spec.orientation(ts, camera.quaternion);
         camera.updateMatrixWorld(true);
         // Sub-pixel jitter for anti-aliasing.
         camera.updateProjectionMatrix();

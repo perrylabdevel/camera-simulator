@@ -7,3 +7,6 @@ export * from './shake';
 export * from './motion';
 export * from './camera';
 export * from './random';
+export * from './modes';
+export * from './metering';
+export * from './critique';

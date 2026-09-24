@@ -51,6 +51,8 @@ Everything can be done with the on-screen panel. The keyboard shortcuts are:
 | `Q` / `E` | Previous / next lens |
 | Mouse wheel | Zoom (zoom lens) · focus (in MF) |
 | `M` | Cycle AF-S / AF-C / MF |
+| `X` | Cycle exposure mode M / A / S / P |
+| `O` | Auto ISO on/off |
 | `C` | Crouch |
 | `T` | Tripod on/off |
 | `I` | Stabilisation on/off |
@@ -64,6 +66,9 @@ Everything can be done with the on-screen panel. The keyboard shortcuts are:
 * **Aperture and depth of field.** Use the 85mm at f/1.4 focused on the subject, then f/8. Turn on the DOF-zone overlay (`V`).
 * **Perspective vs focal length.** The *Perspective lesson* buttons walk you to where 24/50/85/200mm frame the subject the same size. The subject stays the same size while the background grows.
 * **Motion.** Wait for the cyclist (or freeze the world with `F` while they pass). At 1/1000 the rider and spokes are frozen, at 1/30 they blur. Stabilisation and a tripod make no difference to that, because they steady the camera and not the subject.
+* **Exposure modes.** In A you choose the aperture and the camera picks the shutter. In S it's the other way round. P picks both, and Auto ISO raises ISO to keep the shutter at 1/focal length or faster. "HI"/"LO" in the viewfinder means the camera has run out of range.
+* **Panning.** Use *Panning lesson → Go to the path*, wait for the cyclist, drag to follow, and press Space mid-swing. The camera keeps turning during the exposure, so a good pan gives a sharp rider and a streaked background. *Tracking assist* shows what a perfect pan looks like.
+* **Wildlife.** Gulls circle overhead: a telephoto at 1/2000 freezes their wing beats and 1/60 smears them. Pigeons feed near the bench, and a squirrel darts across the lawn by the big tree.
 * **Camera shake.** Turn stabilisation off and try the 200mm at 1/30, then put it on a tripod.
 * **Noise.** Keep the same brightness at ISO 100 and at ISO 12800 (faster shutter), then compare them at 100% in review.
 * **Exposure.** Zebras show where the sensor will clip. The histogram and the review notes explain what was lost.

@@ -28,9 +28,10 @@ import { createShakeTrajectory, shakeAngularSpeed } from '../sim/shake';
 import { temporalSampleCount } from '../sim/motion';
 import { critique, type SubjectFacts } from '../sim/critique';
 import { randomSeed } from '../sim/random';
+import { solveExposure, type ExposureMode } from '../sim/modes';
 import { formatAperture, formatDistance, formatShutter } from '../sim/stops';
 import { PhotoPipeline, type OpticalState, type Overlays, type SensorState } from '../render/pipeline';
-import { buildExposureLab, PORTRAIT_POSITION, type LabScene, type Quality } from '../render/world/park';
+import { buildExposureLab, PORTRAIT_POSITION, type LabScene, type Quality, type Subject } from '../render/world/park';
 import { Photographer } from './photographer';
 import { EvfOverlay } from './evf';
 import { Panel } from './panel';
@@ -63,6 +64,8 @@ interface UiState {
   noisePreview: boolean;
   freeze: boolean;
   muted: boolean;
+  /** Panning aid: the capture rotates exactly with the subject under the AF point. */
+  trackAssist: boolean;
 }
 
 interface FocusHit {
@@ -93,6 +96,7 @@ export class App {
     noisePreview: true,
     freeze: false,
     muted: false,
+    trackAssist: false,
   };
 
   private worldTime = 0;
@@ -130,6 +134,9 @@ export class App {
     this.pipeline = new PhotoPipeline(this.renderer);
 
     this.settings = {
+      mode: 'M',
+      autoIso: false,
+      autoIsoMax: 12800,
       bodyId: bodies[0].id,
       lensId: '50-f1.8',
       focalLengthMm: 50,
@@ -287,6 +294,7 @@ export class App {
     const t0 = performance.now();
     if (!this.ui.freeze) this.worldTime += dt;
     this.photographer.update(dt);
+    this.recordAim();
     this.lab.setTime(this.worldTime);
     this.updateCamera();
 
@@ -313,6 +321,7 @@ export class App {
       // Smooth in log space like a real meter's integration time.
       const a = this.frameCount < 8 ? 1 : 0.35;
       this.meteredLuminance = Math.exp(Math.log(this.meteredLuminance) * (1 - a) + Math.log(Math.max(L, 1e-3)) * a);
+      this.applyAutoExposure();
       if (this.ui.histogram) {
         const img = this.pipeline.readLiveHistogramImage(sensor, optics);
         this.evf.showHistogram(computeHistogram(img));
@@ -346,10 +355,10 @@ export class App {
     const dof = this.dof();
     const info = this.renderer.info;
     this.evf.update({
-      mode: 'M',
+      mode: s.mode + (this.aeLimited ? (this.aeLimited === 'too-bright' ? ' HI' : ' LO') : ''),
       shutter: formatShutter(s.shutterNominal),
       aperture: formatAperture(s.apertureNominal).replace('f/', 'F'),
-      iso: `ISO ${s.isoNominal}`,
+      iso: `ISO ${s.autoIso ? 'A ' : ''}${s.isoNominal}`,
       meterStops: this.meterStops(),
       ec: s.exposureCompensation,
       afMode: s.focusMode,
@@ -414,6 +423,7 @@ export class App {
       this.settings.focalLengthMm = isZoom(l) ? Math.min(l.focalRange[1], Math.max(l.focalRange[0], this.settings.focalLengthMm)) : l.focalRange[0];
     }
     this.settings = constrainSettings(this.settings, this.body, this.lens);
+    this.applyAutoExposure();
     if (patch.focusDistanceM !== undefined) this.focusTarget = this.settings.focusDistanceM;
     if (lensChanged && this.settings.focusMode !== 'MF') this.acquireFocus();
     this.panel.refresh();
@@ -421,11 +431,52 @@ export class App {
 
   private step(kind: 'aperture' | 'shutter' | 'iso' | 'ec', delta: number): void {
     const s = this.settings;
+    if (this.isAuto(kind)) {
+      this.hint = `${kind === 'iso' ? 'ISO' : kind === 'aperture' ? 'Aperture' : 'Shutter speed'} is chosen by the camera in ${s.mode}${kind === 'iso' ? ' with Auto ISO' : ''} mode`;
+      return;
+    }
     if (kind === 'aperture') this.change({ apertureNominal: stepStop(availableApertures(this.lens, s.focalLengthMm), s.apertureNominal, delta) });
     if (kind === 'shutter') this.change({ shutterNominal: stepStop(availableShutters(this.body), s.shutterNominal, delta) });
     if (kind === 'iso') this.change({ isoNominal: stepStop(availableIsos(this.body), s.isoNominal, delta) });
     if (kind === 'ec') this.change({ exposureCompensation: Math.round((s.exposureCompensation + delta / 3) * 3) / 3 });
   }
+
+  /** True when the camera, not the photographer, controls this setting. */
+  isAuto(kind: 'aperture' | 'shutter' | 'iso' | 'ec'): boolean {
+    const m = this.settings.mode;
+    if (kind === 'aperture') return m === 'S' || m === 'P';
+    if (kind === 'shutter') return m === 'A' || m === 'P';
+    if (kind === 'iso') return this.settings.autoIso;
+    return false;
+  }
+
+  /** Let the camera choose the automatic settings for the current mode. */
+  private applyAutoExposure(): void {
+    const s = this.settings;
+    if (s.mode === 'M' && !s.autoIso) {
+      this.aeLimited = null;
+      return;
+    }
+    const r = solveExposure({
+      mode: s.mode,
+      targetEv100: meteredEv100(this.meteredLuminance) - s.exposureCompensation,
+      apertureNominal: s.apertureNominal,
+      shutterNominal: s.shutterNominal,
+      isoNominal: s.isoNominal,
+      autoIso: s.autoIso,
+      autoIsoMax: s.autoIsoMax,
+      autoIsoMinShutter: 1 / Math.max(1, s.focalLengthMm),
+      apertures: availableApertures(this.lens, s.focalLengthMm),
+      shutters: availableShutters(this.body),
+      isos: availableIsos(this.body),
+    });
+    s.apertureNominal = r.apertureNominal;
+    s.shutterNominal = r.shutterNominal;
+    s.isoNominal = r.isoNominal;
+    this.aeLimited = r.limited;
+  }
+
+  private aeLimited: 'too-bright' | 'too-dark' | null = null;
 
   private cycleLens(delta: number): void {
     const i = lenses.findIndex((l) => l.id === this.settings.lensId);
@@ -476,13 +527,22 @@ export class App {
       const shake = createShakeTrajectory(seed, omega);
       const t0 = this.worldTime;
       const basePosition = this.camera.position.clone();
-      const baseQuaternion = this.camera.quaternion.clone();
+      const pan = this.ui.trackAssist ? this.trackingRate(t0) ?? this.panRate() : this.panRate();
+      const yaw0 = this.photographer.yaw;
+      const pitch0 = this.photographer.pitch;
+      const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+      const shakeQ = new THREE.Quaternion();
+      const orientation = (ts: number, q: THREE.Quaternion) => {
+        const sh = shake(ts);
+        q.setFromEuler(euler.set(pitch0 + pan.pitch * ts, yaw0 + pan.yaw * ts, 0, 'YXZ'));
+        return q.multiply(shakeQ.setFromEuler(euler.set(sh.pitch, sh.yaw, sh.roll, 'YXZ')));
+      };
 
       blackout.classList.add('on');
       playShutter(e.shutter, this.ui.muted);
 
       // Measure what will happen during the exposure (for sample count and critique).
-      const measured = this.measureExposure(t0, e.shutter, shake, pxPerMm);
+      const measured = this.measureExposure(t0, e.shutter, orientation, shake, pan, pxPerMm);
       const samples = temporalSampleCount(measured.maxBlurPx);
       const optics = this.optics();
       const sensor = this.sensorState(true);
@@ -493,8 +553,7 @@ export class App {
         t0,
         samples,
         basePosition,
-        baseQuaternion,
-        shake,
+        orientation,
         seed,
         onProgress: (f) => {
           progress.style.width = `${f * 100}%`;
@@ -502,8 +561,10 @@ export class App {
         },
       });
       blackout.classList.remove('on');
-      // The world kept moving while the shutter was open.
+      // The world kept moving while the shutter was open, and so did a panning camera.
       this.worldTime = t0 + e.shutter;
+      this.photographer.yaw = yaw0 + pan.yaw * e.shutter;
+      this.photographer.pitch = pitch0 + pan.pitch * e.shutter;
 
       const hist = computeHistogram(result.captured.data, 2);
       const dof = this.dof();
@@ -528,12 +589,14 @@ export class App {
         focusTarget: this.afHit?.name,
         subjects: measured.subjects,
         pxPerMm,
+        panning: measured.panning,
       });
 
       const [url, seenUrl, thumbUrl] = await Promise.all([toJpegUrl(result.captured, 0.92), toJpegUrl(result.seen, 0.9), toJpegUrl(result.captured, 0.8, 240)]);
       const meta: PhotoMeta = {
         body: body.name,
         lens: lens.name,
+        mode: `${s.mode}${s.autoIso ? ' + Auto ISO' : ''}`,
         focalMm: s.focalLengthMm,
         aperture: s.apertureNominal,
         shutterS: s.shutterNominal,
@@ -571,52 +634,147 @@ export class App {
     }
   }
 
-  /** Predict image-plane motion of subjects and shake over the exposure. */
-  private measureExposure(t0: number, T: number, shake: (t: number) => { yaw: number; pitch: number; roll: number }, pxPerMm: number) {
+  /**
+   * Predict what happens during the exposure, using the same camera motion
+   * the capture will use (panning + shake): image-plane movement of each
+   * subject relative to the frame, shake blur, and background sweep.
+   */
+  private measureExposure(
+    t0: number,
+    T: number,
+    orientation: (t: number, q: THREE.Quaternion) => THREE.Quaternion,
+    shake: (t: number) => { yaw: number; pitch: number; roll: number },
+    pan: { yaw: number; pitch: number },
+    pxPerMm: number,
+  ) {
     const steps = 24;
     const f = this.settings.focalLengthMm;
-    const cam = this.camera;
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const cam = this.camera.clone();
+    const H = 24 * pxPerMm;
+    const W = H * cam.aspect;
+    const poseAt = (ts: number) => {
+      orientation(ts, cam.quaternion);
+      cam.updateMatrixWorld(true);
+    };
     const project = (p: THREE.Vector3) => {
       const v = p.clone().project(cam);
-      return new THREE.Vector2(v.x * 0.5 * (cam.aspect * 24) * pxPerMm, v.y * 0.5 * 24 * pxPerMm);
+      return new THREE.Vector2(v.x * 0.5 * W, v.y * 0.5 * H);
     };
-    const subjects: SubjectFacts[] = [];
+    const af = new THREE.Vector2(this.settings.afPoint.x * 2 - 1, -(this.settings.afPoint.y * 2 - 1));
+    const all: (SubjectFacts & { score: number })[] = [];
     let maxBlurPx = 0;
     for (const subj of this.lab.subjects) {
       this.lab.setTime(t0);
+      poseAt(0);
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
       const p0 = subj.point(new THREE.Vector3());
       const ndc = p0.clone().project(cam);
       const dist = p0.clone().sub(cam.position).dot(forward);
-      const inFrame = dist > 0 && Math.abs(ndc.x) < 0.95 && Math.abs(ndc.y) < 0.95;
+      const sizePx = dist > 0 ? ((2 * subj.radius) / dist) * f * pxPerMm : 0;
+      const inFrame = dist > 0 && Math.abs(ndc.x) < 0.95 && Math.abs(ndc.y) < 0.95 && sizePx > 0.03 * H;
       let len = 0;
       let prev = project(p0);
-      const pStart = p0.clone();
-      let pEnd = p0.clone();
+      const d0 = p0.clone().sub(cam.position).normalize();
+      let dEnd = d0;
       for (let i = 1; i <= steps; i++) {
-        this.lab.setTime(t0 + (T * i) / steps);
-        pEnd = subj.point(new THREE.Vector3());
-        const cur = project(pEnd);
+        const ts = (T * i) / steps;
+        this.lab.setTime(t0 + ts);
+        poseAt(ts);
+        const pt = subj.point(new THREE.Vector3());
+        const cur = project(pt);
         len += cur.distanceTo(prev);
         prev = cur;
+        dEnd = pt.clone().sub(cam.position).normalize();
       }
-      const move = pEnd.clone().sub(pStart);
-      const lateral = move.clone().sub(forward.clone().multiplyScalar(move.dot(forward))).length() / Math.max(T, 1e-6);
+      const angularRate = (d0.angleTo(dEnd) / Math.max(T, 1e-6)) * (180 / Math.PI);
+      const lateral = (d0.angleTo(dEnd) * Math.max(dist, 0.05)) / Math.max(T, 1e-6);
       const defocus = blurDiscMm(f, this.exact().aperture, this.settings.focusDistanceM, Math.max(dist, 0.05)) * pxPerMm;
-      subjects.push({ name: subj.name, inFrame, distanceM: Math.max(dist, 0.05), lateralSpeedMps: Math.min(lateral, subj.speed(t0) * 1.2), motionBlurPx: len, defocusBlurPx: defocus });
-      // Wheel rims and limbs move up to ~2× the body speed.
-      if (inFrame || dist > 0) maxBlurPx = Math.max(maxBlurPx, len * 2);
+      const score = inFrame ? ndc.clone().setZ(0).distanceTo(new THREE.Vector3(af.x, af.y, 0)) - Math.min(0.6, sizePx / H) : Infinity;
+      all.push({
+        name: subj.name,
+        inFrame,
+        distanceM: Math.max(dist, 0.05),
+        lateralSpeedMps: Math.min(lateral, subj.speed(t0) * 1.2),
+        motionBlurPx: len,
+        defocusBlurPx: defocus,
+        angularRateDegPerS: angularRate,
+        score,
+      });
+      // Wheel rims, wings and limbs move up to ~2× the body speed.
+      if (inFrame) maxBlurPx = Math.max(maxBlurPx, len * 2);
     }
     this.lab.setTime(t0);
+    // Only discuss what the photograph is about: subjects near the AF point or large in frame.
+    all.sort((a, b) => a.score - b.score);
+    const subjects: SubjectFacts[] = all.map(({ score: _s, ...rest }, i) => ({ ...rest, inFrame: rest.inFrame && i < 3 }));
     let shakePx = 0;
-    let prev = shake(0);
+    let prevS = shake(0);
     for (let i = 1; i <= steps * 2; i++) {
       const cur = shake((T * i) / (steps * 2));
-      shakePx += Math.hypot(cur.yaw - prev.yaw, cur.pitch - prev.pitch) * f * pxPerMm;
-      prev = cur;
+      shakePx += Math.hypot(cur.yaw - prevS.yaw, cur.pitch - prevS.pitch) * f * pxPerMm;
+      prevS = cur;
     }
-    maxBlurPx = Math.max(maxBlurPx, shakePx);
-    return { subjects, shakePx, maxBlurPx };
+    const panRateRad = Math.hypot(pan.yaw * Math.cos(this.photographer.pitch), pan.pitch);
+    const backgroundBlurPx = panRateRad * T * f * pxPerMm;
+    maxBlurPx = Math.max(maxBlurPx, shakePx, backgroundBlurPx);
+    const panning =
+      panRateRad > 0.02
+        ? { rateDegPerS: (panRateRad * 180) / Math.PI, backgroundBlurPx, assisted: this.ui.trackAssist }
+        : undefined;
+    return { subjects, shakePx, maxBlurPx, panning };
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Panning                                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  private aimHistory: { t: number; yaw: number; pitch: number }[] = [];
+
+  private recordAim(): void {
+    const now = performance.now() / 1000;
+    this.aimHistory.push({ t: now, yaw: this.photographer.yaw, pitch: this.photographer.pitch });
+    while (this.aimHistory.length > 2 && now - this.aimHistory[0].t > 0.25) this.aimHistory.shift();
+  }
+
+  /** Angular velocity (rad/s) of the photographer's swing over the last ~0.15 s. */
+  panRate(): { yaw: number; pitch: number } {
+    const h = this.aimHistory;
+    if (h.length < 2) return { yaw: 0, pitch: 0 };
+    const last = h[h.length - 1];
+    const first = h.find((e) => last.t - e.t <= 0.15) ?? h[0];
+    const dt = last.t - first.t;
+    if (dt < 0.03 || performance.now() / 1000 - last.t > 0.1) return { yaw: 0, pitch: 0 };
+    return { yaw: (last.yaw - first.yaw) / dt, pitch: (last.pitch - first.pitch) / dt };
+  }
+
+  /** Rotation rate that keeps the subject under the AF point still in the frame. */
+  private trackingRate(t0: number): { yaw: number; pitch: number } | null {
+    const cam = this.camera;
+    const af = new THREE.Vector2(this.settings.afPoint.x * 2 - 1, -(this.settings.afPoint.y * 2 - 1));
+    let best: { subj: Subject; d: number } | null = null;
+    this.lab.setTime(t0);
+    for (const subj of this.lab.subjects) {
+      if (subj.speed(t0) < 0.2) continue;
+      const ndc = subj.point(new THREE.Vector3()).project(cam);
+      if (ndc.z > 1 || Math.abs(ndc.x) > 1 || Math.abs(ndc.y) > 1) continue;
+      const d = Math.hypot(ndc.x - af.x, ndc.y - af.y);
+      if (d < 0.35 && (!best || d < best.d)) best = { subj, d };
+    }
+    if (!best) return null;
+    const dt = 0.02;
+    const dir = (t: number) => {
+      this.lab.setTime(t);
+      return best!.subj.point(new THREE.Vector3()).sub(cam.position);
+    };
+    const a = dir(t0);
+    const b = dir(t0 + dt);
+    this.lab.setTime(t0);
+    const yawOf = (v: THREE.Vector3) => Math.atan2(-v.x, -v.z);
+    const pitchOf = (v: THREE.Vector3) => Math.atan2(v.y, Math.hypot(v.x, v.z));
+    let dy = yawOf(b) - yawOf(a);
+    if (dy > Math.PI) dy -= 2 * Math.PI;
+    if (dy < -Math.PI) dy += 2 * Math.PI;
+    return { yaw: dy / dt, pitch: (pitchOf(b) - pitchOf(a)) / dt };
   }
 
   private toastTimer = 0;
@@ -641,16 +799,38 @@ export class App {
 
   private buildPanel(): void {
     const p = this.panel;
-    p.heading('Exposure Lab', 'Manual mode · one full-frame body · a sunny park');
+    p.heading('Exposure Lab', 'One full-frame body · M / A / S / P · a sunny park');
 
     const shutterBtn = el('button', { class: 'shutter', id: 'shutter-btn', text: 'SHUTTER', title: 'Space / Enter' });
     shutterBtn.addEventListener('click', () => void this.shoot());
     p.root.append(shutterBtn, el('div', { class: 'kbd', style: 'text-align:center;margin-bottom:6px', text: 'Space to shoot · R to review' }));
 
     const exp = p.group('Exposure');
+    p.segmented<ExposureMode>(
+      exp,
+      'Mode',
+      [
+        { value: 'M', label: 'M', title: 'Manual: you set aperture, shutter and ISO' },
+        { value: 'A', label: 'A', title: 'Aperture priority: you set the aperture, the camera picks the shutter' },
+        { value: 'S', label: 'S', title: 'Shutter priority: you set the shutter, the camera picks the aperture' },
+        { value: 'P', label: 'P', title: 'Program: the camera picks aperture and shutter' },
+      ],
+      () => this.settings.mode,
+      (v) => this.change({ mode: v }),
+    );
     p.stepper(exp, 'Aperture', () => formatAperture(this.settings.apertureNominal), (d) => this.step('aperture', d), 'Keys 1 / 2');
     p.stepper(exp, 'Shutter', () => formatShutter(this.settings.shutterNominal), (d) => this.step('shutter', d), 'Keys 3 / 4');
-    p.stepper(exp, 'ISO', () => String(this.settings.isoNominal), (d) => this.step('iso', d), 'Keys 5 / 6');
+    p.stepper(exp, 'ISO', () => `${this.settings.autoIso ? 'A ' : ''}${this.settings.isoNominal}`, (d) => this.step('iso', d), 'Keys 5 / 6');
+    p.checks(exp, [
+      { label: 'Auto ISO (O)', get: () => this.settings.autoIso, set: (v) => this.change({ autoIso: v }), title: 'Raises ISO to keep the shutter at 1/focal length or faster' },
+    ]);
+    p.select(
+      exp,
+      'Max ISO',
+      [1600, 3200, 6400, 12800, 25600].map((v) => ({ value: String(v), label: String(v) })),
+      () => String(this.settings.autoIsoMax),
+      (v) => this.change({ autoIsoMax: Number(v) }),
+    );
     p.stepper(exp, 'Exp. comp', () => `${this.settings.exposureCompensation > 0 ? '+' : ''}${this.settings.exposureCompensation.toFixed(1)}`, (d) => this.step('ec', d), 'Shifts the meter target');
     p.segmented<MeteringMode>(
       exp,
@@ -667,7 +847,8 @@ export class App {
       const m = this.meterStops();
       const e = this.exact();
       const sn = snr(this.body.sensor, e.iso, METERED_MIDTONE_SIGNAL);
-      return `Meter: <b>${m >= 0 ? '+' : ''}${m.toFixed(1)} EV</b> ${Math.abs(m) < 0.35 ? '(balanced)' : m > 0 ? '(brighter than meter)' : '(darker than meter)'}<br>Scene ≈ EV ${meteredEv100(this.meteredLuminance).toFixed(1)} · ${Math.round(this.meteredLuminance)} cd/m²<br>Mid-tone SNR at this ISO ≈ ${sn.toFixed(0)}:1`;
+      const lim = this.aeLimited ? `<br><b style="color:#ff8a6a">${this.aeLimited === 'too-bright' ? 'Too bright: the camera has run out of range (try a lower ISO, smaller aperture or faster shutter)' : 'Too dark: the camera has run out of range (try a higher ISO, wider aperture or slower shutter)'}</b>` : '';
+      return `${lim ? lim.slice(4) + '<br>' : ''}Meter: <b>${m >= 0 ? '+' : ''}${m.toFixed(1)} EV</b> ${Math.abs(m) < 0.35 ? '(balanced)' : m > 0 ? '(brighter than meter)' : '(darker than meter)'}<br>Scene ≈ EV ${meteredEv100(this.meteredLuminance).toFixed(1)} · ${Math.round(this.meteredLuminance)} cd/m²<br>Mid-tone SNR at this ISO ≈ ${sn.toFixed(0)}:1`;
     });
     p.buttons(exp, [
       {
@@ -751,7 +932,14 @@ export class App {
     p.checks(stab, [
       { label: 'Stabilisation', get: () => this.settings.stabilization, set: (v) => this.change({ stabilization: v }), title: 'Body IBIS + lens OIS. Steadies the camera, not the subject.' },
       { label: 'Crouch (C)', get: () => this.photographer.crouching, set: (v) => (this.photographer.crouching = v) },
+      {
+        label: 'Tracking assist',
+        get: () => this.ui.trackAssist,
+        set: (v) => (this.ui.trackAssist = v),
+        title: 'Panning aid: during the exposure the camera swings exactly with the moving subject under the AF point',
+      },
     ]);
+    stab.append(el('p', { class: 'help', style: 'margin:4px 0 0', text: 'Panning: drag the view to follow a moving subject and press Space while still moving. The camera keeps swinging during the exposure.' }));
 
     const persp = p.group('Perspective lesson');
     persp.append(el('p', { class: 'help', style: 'margin:0 0 6px', text: 'Frame the portrait the same size with different lenses. The subject stays the same; watch the background.' }));
@@ -767,6 +955,20 @@ export class App {
           this.photographer.lookAt(new THREE.Vector3(0, 1.25, 2));
           this.change({ lensId: '50-f1.8', afPoint: { x: 0.5, y: 0.45 } });
           this.acquireFocus();
+        },
+      },
+    ]);
+
+    const panG = p.group('Panning lesson');
+    panG.append(el('p', { class: 'help', style: 'margin:0 0 6px', text: 'Goal: a sharp cyclist against a streaked background. Try 1/30 s at f/11, follow the rider, and shoot mid-swing.' }));
+    p.buttons(panG, [
+      {
+        label: 'Go to the path',
+        onClick: () => {
+          this.photographer.place(1.5, -0.2);
+          this.photographer.lookAt({ x: 1.5, y: 1.0, z: -4.5 });
+          this.change({ mode: 'S', shutterNominal: 1 / 30, autoIso: true, lensId: '50-f1.8', focusMode: 'AF-C', afPoint: { x: 0.5, y: 0.5 } });
+          this.hint = 'Wait for the cyclist, drag to follow, press Space while swinging';
         },
       },
     ]);
@@ -946,6 +1148,14 @@ export class App {
         return true;
       case 'KeyT':
         this.change({ support: this.settings.support === 'tripod' ? 'handheld' : 'tripod' });
+        return true;
+      case 'KeyX': {
+        const order: ExposureMode[] = ['M', 'A', 'S', 'P'];
+        this.change({ mode: order[(order.indexOf(this.settings.mode) + 1) % order.length] });
+        return true;
+      }
+      case 'KeyO':
+        this.change({ autoIso: !this.settings.autoIso });
         return true;
       case 'KeyI':
         this.change({ stabilization: !this.settings.stabilization });

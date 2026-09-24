@@ -67,3 +67,19 @@ describe('critique wording', () => {
     expect(notes.find((n) => n.topic === 'motion')!.text).toMatch(/1\/30 s exposure/);
   });
 });
+
+describe('panning critique', () => {
+  const mover = { name: 'cyclist', inFrame: true, distanceM: 12, lateralSpeedMps: 6.5, motionBlurPx: 1.2, defocusBlurPx: 0.5, angularRateDegPerS: 31 };
+  it('recognises a successful pan', () => {
+    const notes = critique({ ...base, shutterS: 1 / 30, subjects: [mover], panning: { rateDegPerS: 31, backgroundBlurPx: 60, assisted: false } });
+    const m = notes.find((n) => n.topic === 'motion')!;
+    expect(m.level).toBe('good');
+    expect(m.text).toMatch(/successful pan/);
+  });
+  it('explains a mismatched pan with the rate that was needed', () => {
+    const notes = critique({ ...base, shutterS: 1 / 30, subjects: [{ ...mover, motionBlurPx: 30 }], panning: { rateDegPerS: 12, backgroundBlurPx: 25, assisted: false } });
+    const m = notes.find((n) => n.topic === 'motion')!;
+    expect(m.level).toBe('warn');
+    expect(m.text).toMatch(/31°\/s — you were too slow/);
+  });
+});
