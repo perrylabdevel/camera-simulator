@@ -360,12 +360,13 @@ class BodyBuilder {
       }
     }
     for (let i = 0; i < rings.length - 1; i++) {
-      // Rings are ordered bottom → top; winding makes normals point outward.
+      // Rings are ordered bottom → top and angles run +x → +z, so (a, b, a+1)
+      // is counter-clockwise seen from outside: normals point outward.
       const mat = rings[i + 1].mat;
       for (let k = 0; k < segments; k++) {
         const a = start + i * ringStride + k;
         const b = a + ringStride;
-        this.tris[mat].push(a, a + 1, b, b, a + 1, b + 1);
+        this.tris[mat].push(a, b, a + 1, b, b + 1, a + 1);
       }
     }
     const cap = (ri: number, top: boolean) => {
@@ -377,8 +378,8 @@ class BodyBuilder {
       this.skinWeight.push(1 - r.w, r.w, 0, 0);
       for (let k = 0; k < segments; k++) {
         const a = start + ri * ringStride + k;
-        if (top) this.tris[r.mat].push(a, a + 1, center);
-        else this.tris[r.mat].push(a + 1, a, center);
+        if (top) this.tris[r.mat].push(a + 1, a, center);
+        else this.tris[r.mat].push(a, a + 1, center);
       }
     };
     if (capBottom) cap(0, false);
@@ -855,10 +856,13 @@ export function createPerson(look: PersonLook): Person {
 
   // Legs.
   const legProfile: Profile = [
-    [-0.08, 0.035, 0.035, -0.01],
-    [-0.04, 0.068 * hp, 0.074, -0.008],
-    [0.0, 0.088 * hp, 0.092, 0],
-    [0.08, 0.08 * hp, 0.085, 0.006],
+    // The thigh stays slim above the hip joint so it never pokes through the
+    // top's hem; the full thigh/hip volume starts below it, inside the trousers.
+    [-0.08, 0.03, 0.03, -0.01],
+    [-0.04, 0.05 * hp, 0.055, -0.006],
+    [0.0, 0.06 * hp, 0.064, -0.003],
+    [0.05, 0.08 * hp, 0.084, 0.004],
+    [0.1, 0.08 * hp, 0.084, 0.006],
     [0.2, 0.07, 0.074, 0.008],
     [0.34, 0.058, 0.06, 0.008],
     [0.42, 0.05, 0.055, 0.012],

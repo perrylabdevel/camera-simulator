@@ -24,26 +24,28 @@ function ellipsoid(rx: number, ry: number, rz: number, w = 24, h = 16): THREE.Bu
 
 /** Relaxed standing pose, with optional weight shift and breathing. */
 export function poseStanding(p: Person, breath = 0): void {
-  p.pelvis.rotation.set(0, 0, 0.025);
-  p.chest.rotation.set(-0.02 + breath * 0.006, 0, -0.035);
-  p.neck.rotation.set(0.06, 0, 0.02);
-  p.head.rotation.set(-0.02, 0.12, 0.04);
-  p.arms[0].upper.rotation.set(0.05, 0, -0.1);
-  p.arms[0].fore.rotation.set(-0.35, 0, 0);
-  p.arms[0].hand.rotation.set(0, 0.3, 0);
-  p.arms[1].upper.rotation.set(-0.1, 0, 0.12);
-  p.arms[1].fore.rotation.set(-0.25, 0, 0);
-  p.arms[1].hand.rotation.set(0, -0.3, 0);
-  p.legs[0].thigh.rotation.set(-0.04, 0, -0.06);
-  p.legs[0].shin.rotation.set(0.06, 0, 0.03);
-  p.legs[0].foot.rotation.set(-0.02, -0.2, 0.03);
-  p.legs[1].thigh.rotation.set(0.05, 0, 0.02);
-  p.legs[1].shin.rotation.set(0.02, 0, -0.02);
-  p.legs[1].foot.rotation.set(-0.07, 0.25, 0);
+  // Relaxed contrapposto: weight on the right leg, left knee soft, hips tilted.
+  p.pelvis.rotation.set(0, 0.05, 0.035);
+  p.chest.rotation.set(-0.02 + breath * 0.006, -0.05, -0.05);
+  p.neck.rotation.set(0.05, 0.02, 0.02);
+  p.head.rotation.set(-0.02, 0.1, 0.04);
+  p.arms[0].upper.rotation.set(0.08, 0, -0.14);
+  p.arms[0].fore.rotation.set(-0.5, 0, 0);
+  p.arms[0].hand.rotation.set(0.1, 0.25, 0);
+  p.arms[1].upper.rotation.set(-0.06, 0, 0.16);
+  p.arms[1].fore.rotation.set(-0.35, 0, 0);
+  p.arms[1].hand.rotation.set(0.05, -0.3, 0);
+  p.legs[0].thigh.rotation.set(-0.1, 0, -0.08);
+  p.legs[0].shin.rotation.set(0.2, 0, 0.02);
+  p.legs[0].foot.rotation.set(-0.1, -0.25, 0.02);
+  p.legs[1].thigh.rotation.set(0.02, 0, 0.03);
+  p.legs[1].shin.rotation.set(0.0, 0, -0.02);
+  p.legs[1].foot.rotation.set(-0.02, 0.2, 0);
 }
 
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const DOWN = new THREE.Vector3(0, -1, 0);
 
@@ -264,9 +266,17 @@ export function createCyclist(): Cyclist {
       const arm = person.arms[i];
       const g = grips[i].clone().applyMatrix4(leanGroup.matrixWorld);
       const elbowPole = tmp.set(i === 0 ? -0.5 : 0.5, -1, -0.2).applyQuaternion(root.quaternion);
-      solveTwoBone(arm.upper, arm.fore, UPPER_ARM - 0.02, FOREARM + 0.035, g, elbowPole);
-      // Palms down on the bar.
-      arm.hand.rotation.set(0.25, i === 1 ? Math.PI / 2 : -Math.PI / 2, 0);
+      solveTwoBone(arm.upper, arm.fore, UPPER_ARM - 0.02, FOREARM + 0.045, g, elbowPole); // wrist sits behind the bar so the palm rests on it
+      // Hand on the grip: palm on top of the bar, fingers wrapping down and forward.
+      // Rest pose: fingers along −y, palm facing the body (−x right hand, +x left).
+      const fingers = _v3.set(0, -1, 0.55).normalize().applyQuaternion(root.quaternion);
+      const yAxis = fingers.clone().negate();
+      const xAxis = new THREE.Vector3(0, i === 1 ? 1 : -1, 0);
+      xAxis.addScaledVector(yAxis, -xAxis.dot(yAxis)).normalize();
+      const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis);
+      const worldQ = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis));
+      arm.fore.getWorldQuaternion(_q);
+      arm.hand.quaternion.copy(_q.invert().multiply(worldQ));
     }
   }
 

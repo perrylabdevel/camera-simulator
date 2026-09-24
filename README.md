@@ -29,6 +29,11 @@ Other scripts:
 | `npm run preview`  | Serve the production build                                |
 | `npm run shots`    | Headless visual check: saves UI screenshots and photos A/B/C to `screenshots/` (needs a local Chrome/Chromium; set `CHROME_PATH` if it isn't found) |
 
+Developer tools in `scripts/` (use a local Chrome/Chromium):
+`views.mjs <views.json>` captures several scripted photos in one session, and
+`probe.mjs <snippet.js>` runs a snippet against the live app and prints the result.
+Both are useful for checking geometry, which is hard to judge by eye.
+
 ## Controls
 
 Everything can be done with the on-screen panel. The keyboard shortcuts are:
