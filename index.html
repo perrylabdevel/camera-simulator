@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>Exposure Lab — Camera Simulator</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='8' width='26' height='18' rx='3' fill='%23222' stroke='%23ddd' stroke-width='2'/><circle cx='16' cy='17' r='6' fill='%23333' stroke='%23ddd' stroke-width='2'/><rect x='10' y='5' width='8' height='4' fill='%23ddd'/></svg>" />
+  </head>
+  <body>
+    <div id="app">
+      <main id="stage">
+        <div id="viewfinder">
+          <canvas id="evf" aria-label="Electronic viewfinder"></canvas>
+          <div id="evf-overlay" aria-hidden="true"></div>
+          <div id="blackout"></div>
+        </div>
+        <div id="evf-bar" aria-live="polite"></div>
+        <div id="loading">
+          <div class="spinner"></div>
+          <p id="loading-text">Building the park…</p>
+        </div>
+      </main>
+      <aside id="panel" aria-label="Camera controls"></aside>
+      <section id="filmstrip" aria-label="Captured photographs"></section>
+    </div>
+    <div id="review" class="hidden" role="dialog" aria-modal="true" aria-label="Photo review"></div>
+    <div id="toast" class="hidden"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

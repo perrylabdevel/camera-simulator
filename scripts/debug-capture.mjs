@@ -1,0 +1,36 @@
+// Debug helper: captures one photo with given settings JSON and saves captured + seen.
+import { chromium } from 'playwright-core';
+import { createServer } from 'vite';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+const outDir = path.resolve('screenshots');
+await mkdir(outDir, { recursive: true });
+const settings = JSON.parse(process.argv[2] ?? '{}');
+const tag = process.argv[3] ?? 'debug';
+const pre = process.argv[4] ?? '';
+const server = await createServer({ server: { port: 5198 }, logLevel: 'error' });
+await server.listen();
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+page.on('pageerror', (e) => console.log('[pageerror]', e.message));
+page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log('[page]', m.text().slice(0, 300)); });
+await page.goto(server.resolvedUrls.local[0]);
+await page.waitForFunction(() => window.cameraApp, null, { timeout: 180000 });
+await page.waitForTimeout(1500);
+const res = await page.evaluate(async ([s, pre]) => {
+  const app = window.cameraApp;
+  if (pre) await eval(pre);
+  app.change(s);
+  await new Promise((r) => setTimeout(r, 800));
+  await app.shoot();
+  const last = app.gallery.photos.at(-1);
+  const get = async (u) => Array.from(new Uint8Array(await (await fetch(u)).arrayBuffer()));
+  return { cap: await get(last.url), seen: await get(last.seenUrl), notes: last.notes.map((n) => n.level + ': ' + n.text), meta: last.meta };
+}, [settings, pre]);
+await writeFile(path.join(outDir, `${tag}.jpg`), Buffer.from(res.cap));
+await writeFile(path.join(outDir, `${tag}-seen.jpg`), Buffer.from(res.seen));
+await page.screenshot({ path: path.join(outDir, `${tag}-ui.png`), timeout: 180000 });
+console.log(JSON.stringify(res.meta));
+res.notes.forEach((n) => console.log(' -', n));
+await browser.close();
+await server.close();
