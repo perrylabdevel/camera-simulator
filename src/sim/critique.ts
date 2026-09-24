@@ -6,7 +6,9 @@
  */
 
 import { classifyBlur, shutterToFreeze } from './motion';
-import { formatAperture, formatShutterLong as formatExact, formatDistance, nearestStop, SHUTTER_SPEEDS } from './stops';
+import { APERTURES, formatAperture as formatApertureExact, formatShutterLong as formatExact, formatDistance, nearestStop, SHUTTER_SPEEDS } from './stops';
+
+const formatAperture = (n: number) => formatApertureExact(nearestStop(APERTURES, n).nominal);
 
 /** Display the nominal value a camera would show (1/30, not the exact 1/32). */
 const formatShutterLong = (t: number) => formatExact(nearestStop(SHUTTER_SPEEDS, t).nominal);

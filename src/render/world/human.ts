@@ -913,7 +913,6 @@ export function createPerson(look: PersonLook): Person {
   const bottomMat = std(look.bottom, look.bottomFabric === 'lycra' ? 0.45 : 0.85, { map: bottomMap, sheen: 0.3, sheenRoughness: 0.8, sheenColor: new THREE.Color(look.bottom).lerp(new THREE.Color('#ffffff'), 0.3) });
   bottomMat.map!.repeat.set(4, 3);
   const body = new THREE.SkinnedMesh(bodyGeo, [skinMat, topMat, bottomMat]);
-  body.name = 'body';
   body.castShadow = true;
   body.receiveShadow = true;
   body.frustumCulled = false;

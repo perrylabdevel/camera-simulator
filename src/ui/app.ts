@@ -28,6 +28,8 @@ import { createShakeTrajectory, shakeAngularSpeed } from '../sim/shake';
 import { temporalSampleCount } from '../sim/motion';
 import { critique, type SubjectFacts } from '../sim/critique';
 import { randomSeed } from '../sim/random';
+import assignmentsData from '../data/assignments.json';
+import { evaluateAssignment, validateAssignment, type Assignment, type ShotMeasure, type SubjectMeasure } from '../sim/assignments';
 import { solveExposure, type ExposureMode } from '../sim/modes';
 import { formatAperture, formatDistance, formatShutter } from '../sim/stops';
 import { PhotoPipeline, type OpticalState, type Overlays, type SensorState } from '../render/pipeline';
@@ -42,6 +44,24 @@ import { el } from './dom';
 
 const bodies = bodiesData as BodySpec[];
 const lenses = lensesData as LensSpec[];
+const assignments = assignmentsData as Assignment[];
+const COMPLETED_KEY = 'camsim.completedAssignments';
+
+function loadCompleted(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(COMPLETED_KEY) ?? '[]') as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveCompleted(s: Set<string>): void {
+  try {
+    localStorage.setItem(COMPLETED_KEY, JSON.stringify([...s]));
+  } catch {
+    /* storage unavailable: progress lasts for this session only */
+  }
+}
 
 const CAPTURE_SIZES: Record<Quality, [number, number]> = {
   low: [1200, 800],
@@ -123,7 +143,7 @@ export class App {
     filmstrip: HTMLElement,
     reviewRoot: HTMLElement,
   ) {
-    const errors = [...bodies.flatMap(validateBody), ...lenses.flatMap(validateLens)];
+    const errors = [...bodies.flatMap(validateBody), ...lenses.flatMap(validateLens), ...assignments.flatMap(validateAssignment)];
     if (errors.length) throw new Error(`Invalid equipment data:\n${errors.join('\n')}`);
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
@@ -441,6 +461,14 @@ export class App {
     if (kind === 'ec') this.change({ exposureCompensation: Math.round((s.exposureCompensation + delta / 3) * 3) / 3 });
   }
 
+  selectAssignment(id: string): void {
+    this.activeAssignment = id;
+    this.showHint = false;
+    const a = assignments.find((x) => x.id === id);
+    this.hint = a ? `Assignment: ${a.brief}` : null;
+    this.panel.refresh();
+  }
+
   /** True when the camera, not the photographer, controls this setting. */
   isAuto(kind: 'aperture' | 'shutter' | 'iso' | 'ec'): boolean {
     const m = this.settings.mode;
@@ -477,6 +505,10 @@ export class App {
   }
 
   private aeLimited: 'too-bright' | 'too-dark' | null = null;
+  /** Active assignment id, or '' for free sandbox shooting. */
+  activeAssignment = '';
+  private completed = loadCompleted();
+  private showHint = false;
 
   private cycleLens(delta: number): void {
     const i = lenses.findIndex((l) => l.id === this.settings.lensId);
@@ -513,8 +545,8 @@ export class App {
     const progress = el('div', { id: 'capture-progress', style: 'width:0%' });
     this.viewfinder.append(progress);
     try {
-      if (this.settings.focusMode !== 'MF') this.acquireFocus(true);
       this.updateCamera();
+      if (this.settings.focusMode !== 'MF') this.acquireFocus(true);
       const e = this.exact();
       const s = this.settings;
       const body = this.body;
@@ -592,6 +624,31 @@ export class App {
         panning: measured.panning,
       });
 
+      let assignment: Photo['assignment'];
+      const active = assignments.find((a) => a.id === this.activeAssignment);
+      if (active) {
+        const measure: ShotMeasure = {
+          frameHeightPx: H,
+          sharpPx: Math.max(1.5, circleOfConfusionMm(body.sensor) * pxPerMm),
+          subjects: measured.measures,
+          highlightClip: hist.highlightClip,
+          shadowClip: hist.shadowClip,
+          meterOffset: this.meterStops(),
+          exposureCompensation: s.exposureCompensation,
+          shakePx: measured.shakePx,
+          panBackgroundPx: measured.backgroundBlurPx,
+          backgroundDefocusPx: blurDiscMm(s.focalLengthMm, e.aperture, s.focusDistanceM, Infinity) * pxPerMm,
+          dofNearM: dof.nearM,
+          dofFarM: dof.farM,
+          midtoneSnr: midSnr,
+        };
+        const result = evaluateAssignment(active, measure);
+        assignment = { id: active.id, title: active.title, ...result };
+        if (result.passed && !this.completed.has(active.id)) {
+          this.completed.add(active.id);
+          saveCompleted(this.completed);
+        }
+      }
       const [url, seenUrl, thumbUrl] = await Promise.all([toJpegUrl(result.captured, 0.92), toJpegUrl(result.seen, 0.9), toJpegUrl(result.captured, 0.8, 240)]);
       const meta: PhotoMeta = {
         body: body.name,
@@ -618,7 +675,7 @@ export class App {
         takenAt: new Date(),
         cameraHeightM: basePosition.y,
       };
-      const photo: Photo = { id: ++this.photoId, url, seenUrl, thumbUrl, meta, notes, hist };
+      const photo: Photo = { id: ++this.photoId, url, seenUrl, thumbUrl, meta, notes, hist, assignment };
       this.gallery.add(photo);
       this.toast(photo);
     } catch (err) {
@@ -662,6 +719,7 @@ export class App {
     };
     const af = new THREE.Vector2(this.settings.afPoint.x * 2 - 1, -(this.settings.afPoint.y * 2 - 1));
     const all: (SubjectFacts & { score: number })[] = [];
+    const measures: SubjectMeasure[] = [];
     let maxBlurPx = 0;
     for (const subj of this.lab.subjects) {
       this.lab.setTime(t0);
@@ -689,6 +747,13 @@ export class App {
       const angularRate = (d0.angleTo(dEnd) / Math.max(T, 1e-6)) * (180 / Math.PI);
       const lateral = (d0.angleTo(dEnd) * Math.max(dist, 0.05)) / Math.max(T, 1e-6);
       const defocus = blurDiscMm(f, this.exact().aperture, this.settings.focusDistanceM, Math.max(dist, 0.05)) * pxPerMm;
+      measures.push({
+        name: subj.name,
+        inFrame: dist > 0 && Math.abs(ndc.x) < 1 && Math.abs(ndc.y) < 1,
+        sizeFrac: sizePx / H,
+        motionPx: len,
+        defocusPx: defocus,
+      });
       const score = inFrame ? ndc.clone().setZ(0).distanceTo(new THREE.Vector3(af.x, af.y, 0)) - Math.min(0.6, sizePx / H) : Infinity;
       all.push({
         name: subj.name,
@@ -721,7 +786,7 @@ export class App {
       panRateRad > 0.02
         ? { rateDegPerS: (panRateRad * 180) / Math.PI, backgroundBlurPx, assisted: this.ui.trackAssist }
         : undefined;
-    return { subjects, shakePx, maxBlurPx, panning };
+    return { subjects, measures, shakePx, maxBlurPx, panning, backgroundBlurPx: panning ? backgroundBlurPx : 0 };
   }
 
   /* ---------------------------------------------------------------------- */
@@ -780,7 +845,13 @@ export class App {
   private toastTimer = 0;
   private toast(p: Photo): void {
     const t = document.getElementById('toast')!;
-    const first = p.notes.find((n) => n.level === 'warn') ?? p.notes[0];
+    const first = p.assignment
+      ? {
+          text: p.assignment.passed
+            ? `✓ Assignment complete: ${p.assignment.title}`
+            : `✗ ${p.assignment.title}: ${p.assignment.results.find((r) => !r.passed)?.text ?? ''}`,
+        }
+      : (p.notes.find((n) => n.level === 'warn') ?? p.notes[0]);
     t.innerHTML = '';
     const open = el('button', { class: 'btn small', text: 'Review (R)' });
     open.addEventListener('click', () => {
@@ -940,6 +1011,35 @@ export class App {
       },
     ]);
     stab.append(el('p', { class: 'help', style: 'margin:4px 0 0', text: 'Panning: drag the view to follow a moving subject and press Space while still moving. The camera keeps swinging during the exposure.' }));
+
+    const asg = p.group('Assignments');
+    p.select(
+      asg,
+      'Goal',
+      [{ value: '', label: 'Sandbox (free shooting)' }, ...assignments.map((a) => ({ value: a.id, label: a.title }))],
+      () => this.activeAssignment,
+      (v) => this.selectAssignment(v),
+    );
+    p.readout(asg, () => {
+      const a = assignments.find((x) => x.id === this.activeAssignment);
+      const done = `${this.completed.size} / ${assignments.length} completed`;
+      if (!a) return `Shoot anything — no scoring.<br>${done}`;
+      return `${this.completed.has(a.id) ? '✓ ' : ''}<b>${a.title}</b><br>${a.brief}${this.showHint && a.hint ? `<br><i>Hint: ${a.hint}</i>` : ''}<br>${done}`;
+    });
+    p.buttons(asg, [
+      {
+        label: 'Go to start',
+        title: 'Walk to a good starting position (settings are up to you)',
+        onClick: () => {
+          const a = assignments.find((x) => x.id === this.activeAssignment);
+          if (!a?.setup) return;
+          this.photographer.place(a.setup.x, a.setup.z);
+          this.photographer.lookAt(a.setup.lookAt);
+          if (a.setup.lensId) this.change({ lensId: a.setup.lensId });
+        },
+      },
+      { label: 'Hint', onClick: () => ((this.showHint = !this.showHint), this.panel.refresh()) },
+    ]);
 
     const persp = p.group('Perspective lesson');
     persp.append(el('p', { class: 'help', style: 'margin:0 0 6px', text: 'Frame the portrait the same size with different lenses. The subject stays the same; watch the background.' }));

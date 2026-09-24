@@ -28,10 +28,15 @@ for (const v of views) {
     await new Promise((r) => setTimeout(r, 300));
     await app.shoot();
     const last = app.gallery.photos.at(-1);
-    return Array.from(new Uint8Array(await (await fetch(last.url)).arrayBuffer()));
+    return {
+      bytes: Array.from(new Uint8Array(await (await fetch(last.url)).arrayBuffer())),
+      notes: last.notes.map((n) => `${n.level}: ${n.text}`),
+      assignment: last.assignment ? [`${last.assignment.title}: ${last.assignment.passed ? 'PASSED' : 'failed'}`, ...last.assignment.results.map((r) => `${r.passed ? '✓' : '✗'} ${r.text}`)] : [],
+    };
   }, v);
-  await writeFile(path.join(outDir, `${v.name}.jpg`), Buffer.from(bytes));
+  await writeFile(path.join(outDir, `${v.name}.jpg`), Buffer.from(bytes.bytes));
   console.log('saved', v.name);
+  for (const line of [...bytes.assignment, ...(process.env.NOTES ? bytes.notes : [])]) console.log('   ', line);
 }
 await browser.close();
 await server.close();

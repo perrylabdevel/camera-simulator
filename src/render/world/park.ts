@@ -492,7 +492,7 @@ export function buildExposureLab(renderer: THREE.WebGLRenderer, quality: Quality
       name: 'cyclist',
       point: (t) => cyclist.person.chest.getWorldPosition(t),
       speed: (time) => cyclistAt(time).speedMps,
-      radius: 1.0,
+      radius: 0.9,
     },
     ...gulls.map((g) => ({
       name: 'gull',

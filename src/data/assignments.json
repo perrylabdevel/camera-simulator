@@ -1,0 +1,89 @@
+[
+  {
+    "id": "freeze-cyclist",
+    "title": "Freeze the cyclist",
+    "brief": "Photograph the passing cyclist so rider and wheels look completely still, without an underexposed image.",
+    "hint": "How far does the rider travel in the time the shutter is open? Light has to come from somewhere else if the shutter is short.",
+    "setup": { "x": 2.0, "z": 0.5, "lookAt": { "x": 0, "y": 1.0, "z": -4.5 } },
+    "criteria": [
+      { "kind": "inFrame", "subject": "cyclist", "minSize": 0.12 },
+      { "kind": "frozen", "subject": "cyclist" },
+      { "kind": "inFocus", "subject": "cyclist" },
+      { "kind": "exposure", "maxStops": 1 }
+    ]
+  },
+  {
+    "id": "show-speed",
+    "title": "Show the speed",
+    "brief": "Make a photo where the cyclist is clearly blurred by motion while the park around them stays crisp.",
+    "hint": "The camera must stay still while the subject keeps moving.",
+    "setup": { "x": 2.0, "z": 0.5, "lookAt": { "x": 0, "y": 1.0, "z": -4.5 } },
+    "criteria": [
+      { "kind": "inFrame", "subject": "cyclist", "minSize": 0.1 },
+      { "kind": "motionBlur", "subject": "cyclist", "minPx": 25 },
+      { "kind": "staticBackground", "maxPx": 4 },
+      { "kind": "exposure", "maxStops": 1 }
+    ]
+  },
+  {
+    "id": "pan-cyclist",
+    "title": "Pan with the cyclist",
+    "brief": "Keep the rider reasonably sharp while the background streaks behind them.",
+    "hint": "Follow the rider with the camera and keep swinging through the exposure. A slower shutter makes longer streaks — and makes matching the rider's speed harder.",
+    "setup": { "x": 1.5, "z": -0.2, "lookAt": { "x": 1.5, "y": 1.0, "z": -4.5 } },
+    "criteria": [
+      { "kind": "inFrame", "subject": "cyclist", "minSize": 0.12 },
+      { "kind": "frozen", "subject": "cyclist", "maxBlur": 4 },
+      { "kind": "panStreak", "minPx": 30 },
+      { "kind": "exposure", "maxStops": 1 }
+    ]
+  },
+  {
+    "id": "portrait-separation",
+    "title": "Portrait with separation",
+    "brief": "A head-and-shoulders portrait where the eyes are sharp and the background melts into soft blur.",
+    "hint": "Background blur grows with the aperture's physical size and the subject's magnification. Where you stand matters as much as the lens.",
+    "setup": { "x": -0.6, "z": 5.2, "lookAt": { "x": 0, "y": 1.5, "z": 2 } },
+    "criteria": [
+      { "kind": "inFrame", "subject": "portrait subject", "minSize": 0.25 },
+      { "kind": "inFocus", "subject": "portrait subject" },
+      { "kind": "backgroundBlur", "minFrac": 0.015 },
+      { "kind": "exposure", "maxStops": 1 }
+    ]
+  },
+  {
+    "id": "front-to-back",
+    "title": "Sharp from front to back",
+    "brief": "Crouch by the flowers and make an image that is acceptably sharp from the meadow 2 m in front of you all the way to the distant trees.",
+    "hint": "Look up the hyperfocal distance — and remember a tiny aperture needs light from somewhere.",
+    "setup": { "x": -2.2, "z": 8.8, "lookAt": { "x": -1.0, "y": 0.6, "z": -10 } },
+    "criteria": [
+      { "kind": "deepFocus", "maxNearM": 2.0 },
+      { "kind": "noShake" },
+      { "kind": "exposure", "maxStops": 1 }
+    ]
+  },
+  {
+    "id": "gull-wings",
+    "title": "Freeze a gull's wings",
+    "brief": "Catch one of the circling gulls large enough to see, with its wing beat frozen and the bird in focus.",
+    "hint": "Birds are small and far away; wings move much faster than the body.",
+    "setup": { "x": 0.6, "z": 10.2, "lookAt": { "x": 4, "y": 9, "z": -6 }, "lensId": "70-200-f2.8" },
+    "criteria": [
+      { "kind": "inFrame", "subject": "gull", "minSize": 0.06 },
+      { "kind": "frozen", "subject": "gull", "maxBlur": 2 },
+      { "kind": "inFocus", "subject": "gull", "maxBlur": 2 }
+    ]
+  },
+  {
+    "id": "protect-highlights",
+    "title": "Protect the highlights",
+    "brief": "Photograph the white pavilion in full sun with detail kept in its brightest walls, and without letting the scene fall into darkness.",
+    "hint": "Watch the zebras and the right edge of the histogram.",
+    "setup": { "x": 5.5, "z": -3.0, "lookAt": { "x": 13, "y": 2, "z": -11 } },
+    "criteria": [
+      { "kind": "exposure", "maxStops": 2, "maxHighlightClip": 0.003, "maxShadowClip": 0.05 },
+      { "kind": "noShake" }
+    ]
+  }
+]

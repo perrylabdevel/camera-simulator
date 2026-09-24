@@ -4,6 +4,7 @@
  */
 
 import type { Note } from '../sim/critique';
+import type { AssignmentResult } from '../sim/assignments';
 import { formatAperture, formatDistance, formatShutterLong } from '../sim/stops';
 import { el } from './dom';
 import { drawHistogram, type Histogram } from './histogram';
@@ -43,6 +44,7 @@ export interface Photo {
   meta: PhotoMeta;
   notes: Note[];
   hist: Histogram;
+  assignment?: AssignmentResult & { id: string; title: string };
 }
 
 export function shortSettings(m: PhotoMeta): string {
@@ -191,6 +193,12 @@ export class Gallery {
         text: `Clipped highlights ${(p.hist.highlightClip * 100).toFixed(1)}% · crushed shadows ${(p.hist.shadowClip * 100).toFixed(1)}%`,
       }),
     );
+    if (p.assignment) {
+      side.append(el('h3', { text: `Assignment ${p.assignment.passed ? '✓ passed' : '✗ not yet'}: ${p.assignment.title}` }));
+      const al = el('ul', { class: 'notes' });
+      for (const r of p.assignment.results) al.append(el('li', { class: r.passed ? 'good' : 'warn', text: `${r.passed ? '✓' : '✗'} ${r.text}` }));
+      side.append(al);
+    }
     side.append(el('h3', { text: 'What happened' }));
     const ul = el('ul', { class: 'notes' });
     for (const n of p.notes) ul.append(el('li', { class: n.level }, el('b', { text: n.topic }), n.text));

@@ -63,6 +63,8 @@ Everything can be done with the on-screen panel. The keyboard shortcuts are:
 
 ## What to try
 
+* **Assignments.** Pick a goal in the *Assignments* panel, such as freezing the cyclist, panning, a portrait with background separation, or freezing a gull's wings. Every photo is judged on the result, never on the settings. *Hint* gives a nudge, and sandbox shooting is always available.
+
 * **Aperture and depth of field.** Use the 85mm at f/1.4 focused on the subject, then f/8. Turn on the DOF-zone overlay (`V`).
 * **Perspective vs focal length.** The *Perspective lesson* buttons walk you to where 24/50/85/200mm frame the subject the same size. The subject stays the same size while the background grows.
 * **Motion.** Wait for the cyclist (or freeze the world with `F` while they pass). At 1/1000 the rider and spokes are frozen, at 1/30 they blur. Stabilisation and a tripod make no difference to that, because they steady the camera and not the subject.
@@ -79,5 +81,6 @@ Everything can be done with the on-screen panel. The keyboard shortcuts are:
 * [Camera simulation model](docs/camera-model.md): formulas, sources, calibration
 * [Rendering pipeline](docs/rendering-pipeline.md)
 * [Equipment data format](docs/equipment-format.md)
+* [Assignment format](docs/assignment-format.md)
 * [Known approximations](docs/known-approximations.md)
 * [Decision log](docs/decisions.md)
