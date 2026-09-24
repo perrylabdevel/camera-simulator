@@ -7,7 +7,36 @@ photographic pipeline (exposure, depth of field, motion over the shutter
 interval, camera shake, sensor noise, tone curve). It is not a screenshot
 with filters on top.
 
-This is **Phase 1: the Exposure Lab** from the project handoff.
+The current build is the **Exposure Lab**: one detailed park scene with
+one fictional full-frame body and five lenses. It covers Phase 1 of the
+project handoff completely. It also covers most of Phase 2 (first-person
+photographer), most of Phase 3 (camera simulation), the core of Phase 4
+(assignments) and panning from Phase 6. See [docs/status.md](docs/status.md)
+for what is done and what is left.
+
+### What's in it
+
+* **Scene:** a sunny park lit in absolute photometric units. It has a
+  portrait subject, a passing cyclist, circling gulls, feeding pigeons, a
+  squirrel, trees, a meadow, a white pavilion and deep shade.
+* **Camera:** M / A / S / P modes with Auto ISO, 1/3-stop aperture, shutter
+  and ISO, and exposure compensation. Metering can be evaluative,
+  centre-weighted or spot (which follows the AF point).
+  * White balance: Auto, presets or Kelvin.
+  * Focus: AF-S, AF-C or MF.
+  * Stabilisation, tripod, crouching.
+  * Lenses: 24mm, 35mm, 50mm, 85mm and a 70–200mm zoom.
+* **Photographs:** built by integrating light over the real shutter time.
+  That gives motion blur, spinning wheels, wing beats, camera shake and
+  panning. The photo then goes through thin-lens depth of field, a sensor
+  noise model, highlight clipping, white balance and a camera tone curve.
+* **Viewfinder:** live exposure preview, meter scale, histogram, zebras,
+  focus peaking, DOF-zone overlay and grid.
+* **Review:** photo details, RGB histogram, "what you saw vs what the
+  camera captured", A/B compare, 100% zoom and download. It also shows a
+  deterministic critique that explains cause and effect.
+* **Training:** seven outcome-based assignments, plus perspective and
+  panning lessons. Sandbox shooting is always available.
 
 ## Quick start
 
@@ -23,7 +52,7 @@ Other scripts:
 
 | Command            | What it does                                              |
 |--------------------|-----------------------------------------------------------|
-| `npm test`         | Unit tests for the simulation maths (Vitest)              |
+| `npm test`         | Unit tests for the simulation maths, kinematics, modes, white balance, critique and assignments (Vitest, ~100 tests) |
 | `npm run typecheck`| TypeScript check                                          |
 | `npm run build`    | Type-check and build a static site into `dist/`           |
 | `npm run preview`  | Serve the production build                                |
@@ -41,7 +70,7 @@ Everything can be done with the on-screen panel. The keyboard shortcuts are:
 | Input | Action |
 |---|---|
 | `W A S D` / arrows (`Shift` = faster) | Walk |
-| Drag on the viewfinder | Look around |
+| Drag on the viewfinder | Look around (keep dragging while you shoot to pan) |
 | Click on the viewfinder | Move the AF point there and focus |
 | `Space` / `Enter` | Shutter (autofocuses first in AF-S / AF-C) |
 | `1` / `2` | Aperture wider / narrower (1/3 stop) |
@@ -77,7 +106,11 @@ Everything can be done with the on-screen panel. The keyboard shortcuts are:
 * **Noise.** Keep the same brightness at ISO 100 and at ISO 12800 (faster shutter), then compare them at 100% in review.
 * **Exposure.** Zebras show where the sensor will clip. The histogram and the review notes explain what was lost.
 
+The quality preset can also be set from the URL: `?quality=low|medium|high|ultra`.
+
 ## Documentation
+
+* [Status and roadmap](docs/status.md): what's implemented and what's left
 
 * [Architecture](docs/architecture.md)
 * [Camera simulation model](docs/camera-model.md): formulas, sources, calibration

@@ -17,5 +17,10 @@ current deliberate shortcuts.
 | Wildlife | Gulls, pigeons and a squirrel are simple procedural models on scripted paths (circling, walk/peck, dart/pause). | Correct size, speed and wing-beat rate for shutter and AF lessons, but stylised. The animals don't react to the photographer. |
 | Panning | Swing rate is taken from the view-drag input just before the press and held constant through the exposure. | No acceleration or wobble within the pan. The shake model is still added on top. |
 | Diffraction | Formula implemented; not rendered at preview resolutions. | f/22 is not visibly softer yet. |
-| Rolling shutter, flash, filters, AF performance | Not yet simulated. | Planned phases. |
-| "What you saw" | Instant, eye-adapted to the meter, everything in focus. | A model of perception, not a physical camera. |
+| Autofocus | AF finds the distance by an exact raycast from the AF point and drives focus there in a few frames. AF-C re-acquires every frame. Crowns and meadows use invisible proxy shapes. | AF never hunts, never fails in low light or low contrast, and has no speed differences between bodies/lenses. There is no face/eye detection or subject tracking yet. |
+| Exposure modes | Program line: wide open until 1/focal, then split equally. Auto ISO minimum shutter is fixed at 1/focal. | Reasonable, but no program shift and no user-set minimum shutter. |
+| Auto white balance | Grey-pixel estimate over nearby surfaces on the Planckian locus. It falls back to 5500 K when too little is neutral. | Sensible in daylight. Not tested under artificial or mixed light, since the scene has none yet. |
+| Critique subjects | Notes discuss at most three subjects (near the AF point or large in frame). | Background subjects are ignored on purpose. |
+| Photos | Kept in memory for the session and downloadable as JPEG. | Lost on page reload (only assignment completion is saved). |
+| Rolling shutter, flash, filters, RAW | Not yet simulated. | Planned phases. |
+| "What you saw" | Instant, eye-adapted to the meter and to the colour of the light (auto WB), everything in focus, no noise. | A model of perception, not a physical camera. |

@@ -19,16 +19,24 @@
    raw 1.0 → white balance → tone curve (extended Reinhard with white at
    raw clip, putting metered mid-grey at display 0.18) → +10 % saturation →
    sRGB → mild S-curve. Live-only overlays: zebras, peaking, DOF zone.
-5. **Meter:** the scene target is reduced to a 48×32 luminance grid and
-   read back every 4 frames. The metering pattern is applied on the CPU.
+5. **Meter:** the scene target is reduced to a 48×32 grid and read back
+   every 4 frames. Each cell holds the mean luminance of everything (for
+   the light meter) and the mean colour of nearby surfaces only, with sky
+   and anything beyond 120 m excluded using depth (for auto white
+   balance). Metering patterns, the auto-exposure solver and auto WB run
+   on the CPU in `src/sim`.
+6. **Live histogram:** a 120×80 developed copy of the frame, read back
+   every 4 frames.
 
 ## Capture
 
 A capture renders N sub-frames at stratified times across `[t0, t0 + shutter]`.
 Each sub-frame has:
 
-* the world advanced to that time (cyclist, wheels, cranks, grass, clouds);
-* camera rotation offset by the shake trajectory;
+* the world advanced to that time (cyclist, wheels, cranks, gull wing
+  beats, pigeons, squirrel, grass, clouds);
+* camera orientation from the capture's orientation function: aim at the
+  press + panning swing (`ω·t`) + hand-shake trajectory;
 * sub-pixel projection jitter for anti-aliasing;
 * its own CoC + DOF pass.
 

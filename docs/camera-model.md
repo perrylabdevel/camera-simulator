@@ -128,3 +128,16 @@ assist* substitutes that ideal rate, to show what a perfect pan looks like.
   blue under Daylight WB.
 * "What you saw" always uses auto WB (the eye adapts). The critique flags
   casts above ~60 mired.
+
+## Autofocus (`ui/app.ts`)
+
+* **AF-S:** focuses when you click the viewfinder or press the shutter.
+  **AF-C:** re-focuses every frame on whatever is under the AF point.
+  **MF:** the slider or mouse wheel sets the distance.
+* The distance comes from a raycast through the AF point. Focus uses the
+  distance along the optical axis, because the focal plane is
+  perpendicular to the axis, not spherical.
+* The focus motor approaches the target in dioptres over a few frames and
+  respects the lens's minimum focus distance.
+* The AF box turns green when the hit point is inside the depth of field.
+* AF is idealised (see known-approximations.md).
