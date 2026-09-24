@@ -505,7 +505,7 @@ export class App {
 
       const hist = computeHistogram(result.captured.data, 2);
       const dof = this.dof();
-      const midSnr = snr(body.sensor, e.iso, METERED_MIDTONE_SIGNAL * 2 ** Math.max(-3, Math.min(3, this.meterStops())));
+      const midSnr = snr(body.sensor, e.iso, Math.min(1, METERED_MIDTONE_SIGNAL * 2 ** this.meterStops()));
       const notes = critique({
         aperture: e.aperture,
         shutterS: e.shutter,

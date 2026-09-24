@@ -6,7 +6,10 @@
  */
 
 import { classifyBlur, shutterToFreeze } from './motion';
-import { formatAperture, formatShutterLong, formatDistance } from './stops';
+import { formatAperture, formatShutterLong as formatExact, formatDistance, nearestStop, SHUTTER_SPEEDS } from './stops';
+
+/** Display the nominal value a camera would show (1/30, not the exact 1/32). */
+const formatShutterLong = (t: number) => formatExact(nearestStop(SHUTTER_SPEEDS, t).nominal);
 
 export interface SubjectFacts {
   name: string;
@@ -142,7 +145,9 @@ export function critique(f: ShotFacts): Note[] {
   }
 
   // --- Noise --------------------------------------------------------------
-  if (f.midtoneSnr < 12) {
+  if (f.highlightClipFraction > 0.5) {
+    // Noise is irrelevant when most of the frame is blown out.
+  } else if (f.midtoneSnr < 12) {
     notes.push({
       level: f.midtoneSnr < 7 ? 'warn' : 'info',
       topic: 'noise',

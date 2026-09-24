@@ -60,3 +60,10 @@ describe('critique', () => {
     expect(critique({ ...base, shakeBlurPx: 12, tripod: true }).find((n) => n.topic === 'shake')).toBeUndefined();
   });
 });
+
+describe('critique wording', () => {
+  it('shows nominal shutter speeds', () => {
+    const notes = critique({ ...base, shutterS: 1 / 32, subjects: [{ ...base.subjects[0], motionBlurPx: 40 }] });
+    expect(notes.find((n) => n.topic === 'motion')!.text).toMatch(/1\/30 s exposure/);
+  });
+});
