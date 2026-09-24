@@ -293,7 +293,7 @@ export function buildExposureLab(renderer: THREE.WebGLRenderer, quality: Quality
   sc.near = 1;
   sc.far = 200;
   sun.shadow.bias = -0.0003;
-  sun.shadow.normalBias = 0.035;
+  sun.shadow.normalBias = 0.018;
   sun.shadow.radius = 2.5;
   scene.add(sun, sun.target);
 
@@ -451,6 +451,9 @@ export function buildExposureLab(renderer: THREE.WebGLRenderer, quality: Quality
     shoes: '#e7e4dc',
     hair: '#3a2416',
     longHair: true,
+    topFabric: 'knit',
+    bottomFabric: 'denim',
+    build: 'f',
   });
   portrait.root.position.copy(PORTRAIT_POSITION);
   portrait.root.rotation.y = -0.3;

@@ -37,8 +37,8 @@ export class Photographer {
   }
 
   /** Aim at a world-space point. */
-  lookAt(target: THREE.Vector3): void {
-    const d = target.clone().sub(this.position);
+  lookAt(target: { x: number; y: number; z: number }): void {
+    const d = new THREE.Vector3(target.x, target.y, target.z).sub(this.position);
     this.yaw = Math.atan2(-d.x, -d.z);
     this.pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
   }

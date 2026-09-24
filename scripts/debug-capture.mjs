@@ -14,12 +14,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log('[page]', m.text().slice(0, 300)); });
-await page.goto(server.resolvedUrls.local[0]);
+await page.goto(server.resolvedUrls.local[0] + (process.env.QUALITY ? `?quality=${process.env.QUALITY}` : ''));
 await page.waitForFunction(() => window.cameraApp, null, { timeout: 180000 });
 await page.waitForTimeout(1500);
 const res = await page.evaluate(async ([s, pre]) => {
   const app = window.cameraApp;
   if (pre) await eval(pre);
+  app.ui.freeze = true;
   app.change(s);
   await new Promise((r) => setTimeout(r, 800));
   await app.shoot();

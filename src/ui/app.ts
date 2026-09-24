@@ -163,6 +163,8 @@ export class App {
   }
 
   async start(onStatus: (s: string) => void): Promise<void> {
+    const q = new URLSearchParams(location.search).get('quality');
+    if (q === 'low' || q === 'medium' || q === 'high' || q === 'ultra') this.ui.quality = q;
     onStatus('Growing trees and grass…');
     await new Promise((r) => setTimeout(r, 20));
     this.lab = buildExposureLab(this.renderer, this.ui.quality);
