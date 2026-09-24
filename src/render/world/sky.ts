@@ -56,7 +56,8 @@ vec3 clearSky(vec3 dir) {
   float h = max(dir.y, 0.0);
   float cosSun = dot(dir, uSunDir);
   // Rayleigh-like gradient: deeper blue overhead, bright pale haze at the horizon.
-  vec3 zenith = vec3(0.19, 0.42, 1.0) * 3.6;
+  // ~20 000 K clear-sky zenith (slightly deepened for a photographic blue); ~7 800 K near the horizon.
+  vec3 zenith = vec3(0.34, 0.55, 1.0) * 3.4;
   vec3 horizon = vec3(0.78, 0.88, 1.0) * 8.5;
   float t = pow(1.0 - h, 3.5);
   vec3 sky = mix(zenith, horizon, t);

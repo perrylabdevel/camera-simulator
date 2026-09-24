@@ -64,10 +64,11 @@ export interface ShotFacts {
   pxPerMm: number;
   /** Present when the camera was swung during the exposure. */
   panning?: PanFacts;
+  whiteBalance?: { label: string; kelvin: number; sceneKelvin: number };
 }
 
 export type NoteLevel = 'good' | 'warn' | 'info';
-export type NoteTopic = 'exposure' | 'focus' | 'motion' | 'shake' | 'noise';
+export type NoteTopic = 'exposure' | 'focus' | 'motion' | 'shake' | 'noise' | 'colour';
 
 export interface Note {
   level: NoteLevel;
@@ -191,6 +192,19 @@ export function critique(f: ShotFacts): Note[] {
         level: cls === 'slight' ? 'info' : 'warn',
         topic: 'shake',
         text: `Hand-held camera shake smeared the whole frame by ~${Math.round(f.shakeBlurPx)} px at ${formatShutterLong(f.shutterS)} and ${Math.round(f.focalMm)}mm${f.stabilizationStops > 0 ? ` even with ${f.stabilizationStops} stops of stabilisation` : ' (stabilisation off)'}. A faster shutter, stabilisation or a tripod would fix it.`,
+      });
+    }
+  }
+
+  // --- Colour -------------------------------------------------------------
+  if (f.whiteBalance) {
+    const { label, kelvin, sceneKelvin } = f.whiteBalance;
+    const cast = 1e6 / sceneKelvin - 1e6 / kelvin;
+    if (Math.abs(cast) > 60) {
+      notes.push({
+        level: Math.abs(cast) > 120 ? 'warn' : 'info',
+        topic: 'colour',
+        text: `White balance was ${label} (${Math.round(kelvin)} K) but the light was about ${Math.round(sceneKelvin / 100) * 100} K, so the photo has a ${Math.abs(cast) > 120 ? 'strong' : 'noticeable'} ${cast < 0 ? 'blue' : 'orange'} cast. Match the white balance to the light — or use it creatively.`,
       });
     }
   }

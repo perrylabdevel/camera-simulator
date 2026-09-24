@@ -6,7 +6,7 @@ current deliberate shortcuts.
 | Area | Approximation | Impact |
 |---|---|---|
 | Noise | One output pixel is treated as one photosite ("100 % view"). | Noise is visible at screen size. A downsampled 24 MP file would look ~3.5× cleaner. |
-| Sensor colour | Render RGB is used as camera RGB. WB is fixed at daylight. | Colour is plausible but not a measured camera profile. |
+| Sensor colour | Render RGB (linear sRGB, D65 white) is used as camera RGB; white balance is a diagonal gain; no mixed-light or fluorescent green-magenta (tint) axis. | Colour is plausible but not a measured camera profile. |
 | DOF | Screen-space gather, with CoC capped at 4.5 % of frame height. | Very close foregrounds wide open blur less than they should. Hidden background behind blurred foreground edges is not reconstructed. |
 | Bokeh shape | Circular. Blade count is not used yet. | No polygonal bokeh or cat's-eye yet. |
 | Focus breathing | FOV uses f, not the image distance. | Up to ~10 % framing change at MFD is ignored. |

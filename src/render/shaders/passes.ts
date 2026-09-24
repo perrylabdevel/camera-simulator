@@ -92,23 +92,35 @@ void main() {
 `;
 
 export const METER_FRAG = /* glsl */ `
+#include <packing>
 ${COMMON}
 uniform sampler2D tInput;
+uniform sampler2D tDepth;
+uniform float uNear;
+uniform float uFar;
 uniform vec2 uCell;
 varying vec2 vUv;
 void main() {
   // 4×4 taps across the cell this texel represents.
-  float sum = 0.0;
-  float mx = 0.0;
+  // rgb: mean colour of nearby surfaces only (sky and hazy distance excluded,
+  //      since both are effectively skylight), for auto white balance;
+  // a:   mean luminance of everything (for the light meter).
+  vec3 surf = vec3(0.0);
+  float nSurf = 0.0;
+  float lum = 0.0;
   for (int y = 0; y < 4; y++) {
     for (int x = 0; x < 4; x++) {
-      vec2 o = (vec2(float(x), float(y)) + 0.5) / 4.0 - 0.5;
-      float l = lum709(texture2D(tInput, vUv + o * uCell).rgb);
-      sum += l;
-      mx = max(mx, l);
+      vec2 uv = vUv + ((vec2(float(x), float(y)) + 0.5) / 4.0 - 0.5) * uCell;
+      vec3 c = texture2D(tInput, uv).rgb;
+      lum += lum709(c);
+      float z = -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, uNear, uFar);
+      if (z < 120.0) {
+        surf += c;
+        nSurf += 1.0;
+      }
     }
   }
-  gl_FragColor = vec4(sum / 16.0, mx, 0.0, 1.0);
+  gl_FragColor = vec4(nSurf > 0.0 ? surf / nSurf : vec3(0.0), lum / 16.0);
 }
 `;
 

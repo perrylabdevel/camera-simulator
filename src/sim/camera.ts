@@ -8,6 +8,7 @@ import { APERTURES, ISOS, SHUTTER_SPEEDS, stopsInRange, type StopValue } from '.
 import type { Support } from './shake';
 import type { ExposureTriangle } from './exposure';
 import type { ExposureMode } from './modes';
+import type { WhiteBalancePreset } from './whiteBalance';
 
 export type FocusMode = 'AF-S' | 'AF-C' | 'MF';
 export type MeteringMode = 'evaluative' | 'center' | 'spot';
@@ -17,6 +18,9 @@ export interface CameraSettings {
   mode: ExposureMode;
   autoIso: boolean;
   autoIsoMax: number;
+  whiteBalance: WhiteBalancePreset;
+  /** Used when whiteBalance is 'kelvin'. */
+  wbKelvin: number;
   bodyId: string;
   lensId: string;
   focalLengthMm: number;

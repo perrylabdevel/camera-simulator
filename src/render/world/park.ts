@@ -282,7 +282,8 @@ export function buildExposureLab(renderer: THREE.WebGLRenderer, quality: Quality
   scene.environment = createSkyEnvironment(renderer, skyParams);
   scene.fog = new THREE.FogExp2(new THREE.Color(6.2, 7.0, 8.2), 0.0021);
 
-  const sun = new THREE.DirectionalLight(new THREE.Color(1.0, 0.95, 0.88), luxToIntensity(SUN_ILLUMINANCE_LUX));
+  // Afternoon sunlight ≈ 5200 K (sim/whiteBalance sceneWhiteRgb(5200), normalised to red).
+  const sun = new THREE.DirectionalLight(new THREE.Color(1.0, 0.87, 0.69), luxToIntensity(SUN_ILLUMINANCE_LUX));
   sun.position.copy(SUN_DIRECTION).multiplyScalar(80).add(new THREE.Vector3(0, 0, -10));
   sun.target.position.set(0, 0, -10);
   sun.castShadow = true;

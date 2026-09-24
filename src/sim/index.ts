@@ -10,3 +10,5 @@ export * from './random';
 export * from './modes';
 export * from './metering';
 export * from './critique';
+export * from './whiteBalance';
+export * from './assignments';

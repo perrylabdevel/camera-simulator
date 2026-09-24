@@ -31,6 +31,7 @@ import { randomSeed } from '../sim/random';
 import assignmentsData from '../data/assignments.json';
 import { evaluateAssignment, validateAssignment, type Assignment, type ShotMeasure, type SubjectMeasure } from '../sim/assignments';
 import { solveExposure, type ExposureMode } from '../sim/modes';
+import { autoWhiteBalance, whiteBalanceGains, WB_LABELS, WB_PRESET_KELVIN, type WhiteBalancePreset } from '../sim/whiteBalance';
 import { formatAperture, formatDistance, formatShutter } from '../sim/stops';
 import { PhotoPipeline, type OpticalState, type Overlays, type SensorState } from '../render/pipeline';
 import { buildExposureLab, PORTRAIT_POSITION, type LabScene, type Quality, type Subject } from '../render/world/park';
@@ -122,6 +123,8 @@ export class App {
   private worldTime = 0;
   private lastFrame = performance.now();
   private meteredLuminance = 3000;
+  /** Camera's auto-white-balance estimate of the light (K), smoothed. */
+  private awbKelvin = 5500;
   private focusTarget: number;
   private afHit: FocusHit | null = null;
   private afState: 'idle' | 'focused' | 'miss' = 'idle';
@@ -157,6 +160,8 @@ export class App {
       mode: 'M',
       autoIso: false,
       autoIsoMax: 12800,
+      whiteBalance: 'auto',
+      wbKelvin: 5500,
       bodyId: bodies[0].id,
       lensId: '50-f1.8',
       focalLengthMm: 50,
@@ -260,8 +265,21 @@ export class App {
       fullScaleElectrons: fullScaleElectrons(this.body.sensor, e.iso),
       readNoiseElectrons: this.body.sensor.readNoiseElectrons,
       noise,
-      whiteBalance: [1, 1, 1],
+      whiteBalance: whiteBalanceGains(this.wbKelvin()),
     };
+  }
+
+  /** Colour temperature the camera is balancing for. */
+  wbKelvin(): number {
+    const wb = this.settings.whiteBalance;
+    if (wb === 'auto') return this.awbKelvin;
+    if (wb === 'kelvin') return this.settings.wbKelvin;
+    return WB_PRESET_KELVIN[wb];
+  }
+
+  private wbLabel(): string {
+    const wb = this.settings.whiteBalance;
+    return wb === 'kelvin' ? `${this.settings.wbKelvin} K` : WB_LABELS[wb];
   }
 
   /** Eye-adapted exposure used for the "what you saw" frame. */
@@ -269,7 +287,8 @@ export class App {
     const ev = meteredEv100(this.meteredLuminance);
     const e = { aperture: 4, shutter: 1, iso: 100 };
     e.shutter = (e.aperture * e.aperture) / 2 ** ev;
-    return { exposureScale: sensorExposureScale(e), vignetteStops: 0, fullScaleElectrons: 1e9, readNoiseElectrons: 0, noise: false, whiteBalance: [1, 1, 1] };
+    // The eye adapts to the colour of the light, so "what you saw" is always auto-balanced.
+    return { exposureScale: sensorExposureScale(e), vignetteStops: 0, fullScaleElectrons: 1e9, readNoiseElectrons: 0, noise: false, whiteBalance: whiteBalanceGains(this.awbKelvin) };
   }
 
   private overlays(): Overlays {
@@ -342,6 +361,8 @@ export class App {
       const a = this.frameCount < 8 ? 1 : 0.35;
       this.meteredLuminance = Math.exp(Math.log(this.meteredLuminance) * (1 - a) + Math.log(Math.max(L, 1e-3)) * a);
       this.applyAutoExposure();
+      const k = autoWhiteBalance(grid.rgb);
+      this.awbKelvin = this.frameCount < 8 ? k : this.awbKelvin + (k - this.awbKelvin) * 0.25;
       if (this.ui.histogram) {
         const img = this.pipeline.readLiveHistogramImage(sensor, optics);
         this.evf.showHistogram(computeHistogram(img));
@@ -384,7 +405,7 @@ export class App {
       afMode: s.focusMode,
       focal: `${Math.round(s.focalLengthMm)}mm`,
       metering: s.metering === 'evaluative' ? '◉ eval' : s.metering === 'center' ? '◎ ctr' : '• spot',
-      wb: 'WB ☀',
+      wb: `WB ${this.settings.whiteBalance === 'auto' ? 'AUTO' : this.wbLabel().toUpperCase()}`,
       support: s.support === 'tripod' ? 'TRIPOD' : s.stabilization ? 'IS ON' : 'IS OFF',
       afPoint: s.afPoint,
       afState: this.afState,
@@ -622,6 +643,7 @@ export class App {
         subjects: measured.subjects,
         pxPerMm,
         panning: measured.panning,
+        whiteBalance: { label: this.wbLabel(), kelvin: this.wbKelvin(), sceneKelvin: this.awbKelvin },
       });
 
       let assignment: Photo['assignment'];
@@ -665,7 +687,7 @@ export class App {
         metering: s.metering,
         stabilization: s.support === 'tripod' ? 'n/a (tripod)' : stabStops > 0 ? `${stabStops} stops` : 'off',
         support: s.support,
-        whiteBalance: 'Daylight (5500 K)',
+        whiteBalance: `${this.wbLabel()} (${Math.round(this.wbKelvin())} K)`,
         meterOffset: this.meterStops(),
         dofNearM: dof.nearM,
         dofFarM: dof.farM,
@@ -953,6 +975,30 @@ export class App {
       () => isZoom(this.lens),
       () => `${Math.round(this.settings.focalLengthMm)} mm`,
     );
+
+    const colour = p.group('Colour');
+    p.select(
+      colour,
+      'White bal.',
+      (Object.keys(WB_LABELS) as WhiteBalancePreset[]).map((k) => ({
+        value: k,
+        label: k === 'auto' || k === 'kelvin' ? WB_LABELS[k] : `${WB_LABELS[k]} (${WB_PRESET_KELVIN[k]} K)`,
+      })),
+      () => this.settings.whiteBalance,
+      (v) => this.change({ whiteBalance: v as WhiteBalancePreset }),
+    );
+    p.slider(
+      colour,
+      'Kelvin',
+      2500,
+      10000,
+      100,
+      () => this.settings.wbKelvin,
+      (v) => this.change({ wbKelvin: v, whiteBalance: 'kelvin' }),
+      () => true,
+      () => `${this.settings.wbKelvin} K`,
+    );
+    p.readout(colour, () => `Light here ≈ ${Math.round(this.awbKelvin / 100) * 100} K (camera estimate) · balancing for ${Math.round(this.wbKelvin())} K`);
 
     const focus = p.group('Focus');
     p.segmented<FocusMode>(
@@ -1252,6 +1298,11 @@ export class App {
       case 'KeyX': {
         const order: ExposureMode[] = ['M', 'A', 'S', 'P'];
         this.change({ mode: order[(order.indexOf(this.settings.mode) + 1) % order.length] });
+        return true;
+      }
+      case 'KeyB': {
+        const order = Object.keys(WB_LABELS) as WhiteBalancePreset[];
+        this.change({ whiteBalance: order[(order.indexOf(this.settings.whiteBalance) + 1) % order.length] });
         return true;
       }
       case 'KeyO':

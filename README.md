@@ -53,6 +53,7 @@ Everything can be done with the on-screen panel. The keyboard shortcuts are:
 | `M` | Cycle AF-S / AF-C / MF |
 | `X` | Cycle exposure mode M / A / S / P |
 | `O` | Auto ISO on/off |
+| `B` | Cycle white balance |
 | `C` | Crouch |
 | `T` | Tripod on/off |
 | `I` | Stabilisation on/off |
@@ -70,6 +71,7 @@ Everything can be done with the on-screen panel. The keyboard shortcuts are:
 * **Motion.** Wait for the cyclist (or freeze the world with `F` while they pass). At 1/1000 the rider and spokes are frozen, at 1/30 they blur. Stabilisation and a tripod make no difference to that, because they steady the camera and not the subject.
 * **Exposure modes.** In A you choose the aperture and the camera picks the shutter. In S it's the other way round. P picks both, and Auto ISO raises ISO to keep the shutter at 1/focal length or faster. "HI"/"LO" in the viewfinder means the camera has run out of range.
 * **Panning.** Use *Panning lesson → Go to the path*, wait for the cyclist, drag to follow, and press Space mid-swing. The camera keeps turning during the exposure, so a good pan gives a sharp rider and a streaked background. *Tracking assist* shows what a perfect pan looks like.
+* **White balance.** Try Tungsten in daylight, or walk into the tree shade with Daylight WB to see how blue open shade really is. The *Colour* panel shows the camera's estimate of the light.
 * **Wildlife.** Gulls circle overhead: a telephoto at 1/2000 freezes their wing beats and 1/60 smears them. Pigeons feed near the bench, and a squirrel darts across the lawn by the big tree.
 * **Camera shake.** Turn stabilisation off and try the 200mm at 1/30, then put it on a tripod.
 * **Noise.** Keep the same brightness at ISO 100 and at ISO 12800 (faster shutter), then compare them at 100% in review.

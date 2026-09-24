@@ -143,7 +143,7 @@ export class PhotoPipeline {
       uFrame: { value: 0 },
     });
     this.copyMat = mk(COPY_FRAG, { tInput: { value: null }, uWeight: { value: 1 } });
-    this.meterMat = mk(METER_FRAG, { tInput: { value: null }, uCell: { value: new THREE.Vector2() } });
+    this.meterMat = mk(METER_FRAG, { tInput: { value: null }, tDepth: { value: null }, uNear: { value: 0.05 }, uFar: { value: 3000 }, uCell: { value: new THREE.Vector2() } });
     this.developMat = mk(DEVELOP_FRAG, {
       tInput: { value: null },
       uTexel: { value: new THREE.Vector2() },
@@ -275,24 +275,33 @@ export class PhotoPipeline {
   }
 
   /**
-   * Average scene luminance grid (cd/m²) of the last live frame.
-   * Returns METER_W × METER_H values, row 0 = bottom.
+   * Meter readings of the last live frame, METER_W × METER_H cells (row 0 = bottom):
+   * `mean` = average luminance (cd/m²) including sky; `rgb` = average colour of
+   * surfaces only (sky excluded), for auto white balance.
    */
-  readMeter(): { mean: Float32Array; max: Float32Array } {
-    if (!this.live) return { mean: new Float32Array(0), max: new Float32Array(0) };
+  readMeter(): { mean: Float32Array; rgb: Float32Array } {
+    if (!this.live) return { mean: new Float32Array(0), rgb: new Float32Array(0) };
     const u = this.meterMat.uniforms;
     u.tInput.value = this.live.scene.texture;
+    u.tDepth.value = this.live.scene.depthTexture;
+    u.uNear.value = this.cocMat.uniforms.uNear.value;
+    u.uFar.value = this.cocMat.uniforms.uFar.value;
     u.uCell.value.set(1 / PhotoPipeline.METER_W, 1 / PhotoPipeline.METER_H);
     this.pass(this.meterMat, this.meterRT);
     this.renderer.readRenderTargetPixels(this.meterRT, 0, 0, PhotoPipeline.METER_W, PhotoPipeline.METER_H, this.meterBuf);
     const n = PhotoPipeline.METER_W * PhotoPipeline.METER_H;
     const mean = new Float32Array(n);
-    const max = new Float32Array(n);
+    const rgb = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
-      mean[i] = this.meterBuf[i * 4] * LUMINANCE_UNIT;
-      max[i] = this.meterBuf[i * 4 + 1] * LUMINANCE_UNIT;
+      const r = this.meterBuf[i * 4] * LUMINANCE_UNIT;
+      const g = this.meterBuf[i * 4 + 1] * LUMINANCE_UNIT;
+      const b = this.meterBuf[i * 4 + 2] * LUMINANCE_UNIT;
+      rgb[i * 3] = r;
+      rgb[i * 3 + 1] = g;
+      rgb[i * 3 + 2] = b;
+      mean[i] = this.meterBuf[i * 4 + 3] * LUMINANCE_UNIT;
     }
-    return { mean, max };
+    return { mean, rgb };
   }
 
   /** Small developed copy of the last live frame for the live histogram (RGBA8, row 0 = bottom). */

@@ -107,3 +107,24 @@ then measured relative to the moving frame, and background sweep is
 `|ω|·t·f` on the sensor. The critique compares the swing rate with the
 subject's angular rate (the rate that would have tracked it). *Tracking
 assist* substitutes that ideal rate, to show what a perfect pan looks like.
+
+## White balance (`sim/whiteBalance.ts`)
+
+* Colour temperature → chromaticity: the Planckian-locus cubic spline of
+  Kim et al. (2002), valid 1667–25 000 K. Then xy → XYZ → linear sRGB
+  (IEC 61966-2-1). The tests check it against CIE reference points
+  (illuminant A, 6500 K).
+* The renderer's RGB white is D65, so the gains are
+  `rgb(6504 K) / rgb(T)` per channel, with green = 1. 6504 K gives unit gains.
+* **Presets:** Daylight 5500, Cloudy 6500, Shade 7500, Tungsten 3200,
+  Fluorescent 4000, Flash 5500, plus manual Kelvin.
+* **Auto:** grey-pixel estimation over the meter grid. Only bright cells
+  on nearby surfaces count, and only if their colour lies on the Planckian
+  locus. Sky and hazy distance are excluded because they are skylight, not
+  surfaces, and green grass fails the locus test. With too little neutral
+  content the camera falls back to 5500 K.
+* Scene lighting uses measured colours: afternoon sun ≈ 5200 K, clear-sky
+  zenith ≈ 20 000 K, horizon ≈ 7800 K. Open shade is therefore genuinely
+  blue under Daylight WB.
+* "What you saw" always uses auto WB (the eye adapts). The critique flags
+  casts above ~60 mired.

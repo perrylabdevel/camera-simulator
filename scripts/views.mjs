@@ -35,6 +35,10 @@ for (const v of views) {
     };
   }, v);
   await writeFile(path.join(outDir, `${v.name}.jpg`), Buffer.from(bytes.bytes));
+  if (v.ui) {
+    await page.evaluate(() => document.getElementById('toast')?.classList.add('hidden'));
+    await page.screenshot({ path: path.join(outDir, `${v.name}-ui.png`), timeout: 180000 });
+  }
   console.log('saved', v.name);
   for (const line of [...bytes.assignment, ...(process.env.NOTES ? bytes.notes : [])]) console.log('   ', line);
 }
